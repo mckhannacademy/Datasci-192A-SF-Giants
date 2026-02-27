@@ -1,0 +1,31 @@
+team_code,team_name,stadium_name,dataset_file,data_start_year,data_end_year
+AZ,Diamondbacks,Chase Field,dbacks_data_2015.csv,2015,2025
+ATH,Athletics,Oakland Coliseum,athletics_data_2015.csv,2015,2025
+ATL,Braves,Truist Park,braves_data_2015.csv,2015,2025
+BAL,Orioles,Camden Yards,orioles_data_2015.csv,2015,2025
+BOS,Red Sox,Fenway Park,fenway_data_2016.csv,2016,2025
+CHC,Cubs,Wrigley Field,cubs_data_2015.csv,2015,2025
+CIN,Reds,Great American Ball Park,reds_data_2015.csv,2015,2025
+CLE,Guardians,Progressive Field,guardians_data_2015.csv,2015,2025
+COL,Rockies,Coors Field,rockies_data_2016.csv,2016,2025
+CWS,White Sox,Guaranteed Rate Field,white_sox_data_2015.csv,2015,2025
+DET,Tigers,Comerica Park,tigers_data_2015.csv,2015,2025
+HOU,Astros,Minute Maid Park,astros_data_2017.csv,2017,2025
+KC,Royals,Kauffman Stadium,royals_data_2015.csv,2015,2025
+LAA,Angels,Angel Stadium,angels_data_2018.csv,2018,2025
+LAD,Dodgers,Dodger Stadium,dodgers_data_2015.csv,2015,2025
+MIA,Marlins,loanDepot Park,marlins_data_2020.csv,2020,2025
+MIL,Brewers,American Family Field,brewers_data_2015.csv,2015,2025
+MIN,Twins,Target Field,twins_data_2015.csv,2015,2025
+NYM,Mets,Citi Field,mets_data_2015.csv,2015,2025
+NYY,Yankees,Yankee Stadium,yankee_data_2015.csv,2015,2025
+PHI,Phillies,Citizens Bank Park,phillies_data_2015.csv,2015,2025
+PIT,Pirates,PNC Park,pirates_data_2015.csv,2015,2025
+SD,Padres,Petco Park,padres_data_2015.csv,2015,2025
+SEA,Mariners,T-Mobile Park,mariners_data_2015.csv,2015,2025
+SF,Giants,Oracle Park,giants_data_2020.csv,2020,2025
+STL,Cardinals,Busch Stadium,cardinals_data_2015.csv,2015,2025
+TB,Rays,Tropicana Field,rays_data_2015.csv,2015,2025
+TEX,Rangers,Globe Life Field,rangers_data_2015.csv,2015,2025
+TOR,Blue Jays,Rogers Centre,blue_jays_data_2015.csv,2015,2025
+WSH,Nationals,Nationals Park,nationals_data_2015.csv,2015,2025
