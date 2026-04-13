@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg0: #0b0e14; --bg1: #111620; --bg2: #161d2b; --bg3: #1c2538; --bg4: #222d42;
+    --line: rgba(255,255,255,0.07); --line2: rgba(255,255,255,0.13);
+    --text0: #e8ecf4; --text1: #a8b2c8; --text2: #5e6e8a;
+    --accent: #3d7fff; --accent2: #1a56cc; --warm: #f5803e; --cold: #40b4e5;
+    --green: #34c77b; --amber: #f5c842; --red: #e85050; --wind: #9b6fff;
+    --font-h: 'Barlow Condensed', sans-serif; --font-b: 'Barlow', sans-serif; --font-m: 'DM Mono', monospace;
+  }
+
+  body { background: var(--bg0); color: var(--text0); font-family: var(--font-b); font-size: 13px; min-height: 100vh; }
+  .shell { display: grid; grid-template-rows: 52px 1fr; min-height: 100vh; }
+  .topbar { background: var(--bg1); border-bottom: 1px solid var(--line2); display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+  .topbar-logo { font-family: var(--font-h); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; color: var(--text0); white-space: nowrap; }
+  .topbar-logo span { color: var(--accent); }
+  .topbar-divider { width: 1px; height: 24px; background: var(--line2); }
+  .topbar-label { font-size: 11px; color: var(--text2); letter-spacing: 0.06em; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .status-label { font-size: 11px; color: var(--text2); letter-spacing: 0.05em; }
+
+  .body { display: grid; grid-template-columns: 260px 1fr; overflow: hidden; height: calc(100vh - 52px); }
+
+  .sidebar { background: var(--bg1); border-right: 1px solid var(--line2); overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 20px; }
+  .sidebar-section-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text2); padding: 0 6px; margin-bottom: 6px; }
+  .stadium-search { background: var(--bg3); border: 1px solid var(--line2); color: var(--text0); padding: 7px 10px; border-radius: 6px; font-family: var(--font-b); font-size: 12px; width: 100%; margin-bottom: 6px; }
+  .stadium-search:focus { outline: none; border-color: var(--accent); }
+  .stadium-search::placeholder { color: var(--text2); }
+  .stadium-list { display: flex; flex-direction: column; gap: 2px; }
+  .stadium-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s; border: 1px solid transparent; }
+  .stadium-item:hover { background: var(--bg3); }
+  .stadium-item.active { background: var(--bg3); border-color: var(--accent); }
+  .stadium-item.hidden { display: none; }
+  .stadium-abbr { font-family: var(--font-h); font-weight: 700; font-size: 14px; color: var(--accent); width: 32px; flex-shrink: 0; }
+  .stadium-meta { flex: 1; min-width: 0; }
+  .stadium-name { font-size: 12px; font-weight: 500; color: var(--text0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stadium-city { font-size: 11px; color: var(--text2); }
+  .stadium-roof { font-size: 10px; background: rgba(61,127,255,0.15); color: var(--accent); border-radius: 3px; padding: 1px 5px; font-family: var(--font-m); flex-shrink: 0; }
+
+  .date-block { display: flex; flex-direction: column; gap: 6px; }
+  .date-block label { font-size: 11px; color: var(--text2); letter-spacing: 0.05em; }
+  .date-block input[type="date"], .date-block select { background: var(--bg3); border: 1px solid var(--line2); color: var(--text0); padding: 7px 10px; border-radius: 6px; font-family: var(--font-b); font-size: 12px; width: 100%; cursor: pointer; }
+  .date-block input[type="date"]:focus, .date-block select:focus { outline: none; border-color: var(--accent); }
+
+  .weather-inputs { display: flex; flex-direction: column; gap: 10px; }
+  .wx-row { display: flex; flex-direction: column; gap: 4px; }
+  .wx-row label { font-size: 11px; color: var(--text2); display: flex; justify-content: space-between; }
+  .wx-row label span { color: var(--text0); font-family: var(--font-m); font-size: 11px; }
+  .wx-row input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+  .run-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 10px; font-family: var(--font-h); font-weight: 600; font-size: 14px; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; transition: background 0.15s; }
+  .run-btn:hover { background: var(--accent2); }
+
+  .main { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .stadium-header { display: flex; align-items: flex-start; gap: 16px; }
+  .stadium-title-block { flex: 1; }
+  .stadium-title { font-family: var(--font-h); font-weight: 700; font-size: 28px; letter-spacing: 0.02em; line-height: 1; color: var(--text0); }
+  .stadium-subtitle { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .stadium-blurb { font-size: 12px; color: var(--text2); line-height: 1.6; margin-top: 8px; max-width: 780px; border-left: 2px solid var(--bg4); padding-left: 10px; }
+  .context-badges { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .badge { font-size: 11px; font-family: var(--font-m); border-radius: 4px; padding: 3px 8px; }
+  .badge-blue { background: rgba(61,127,255,0.15); color: var(--accent); }
+  .badge-amber { background: rgba(245,200,66,0.15); color: var(--amber); }
+  .badge-red { background: rgba(232,80,80,0.15); color: var(--red); }
+  .badge-wind { background: rgba(155,111,255,0.15); color: var(--wind); }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .kpi-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden; }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .kpi-card.up::before { background: var(--green); }
+  .kpi-card.down::before { background: var(--red); }
+  .kpi-card.neutral::before { background: var(--text2); }
+  .kpi-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text2); }
+  .kpi-value { font-family: var(--font-h); font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi-value.up { color: var(--green); }
+  .kpi-value.down { color: var(--red); }
+  .kpi-value.neutral { color: var(--text1); }
+  .kpi-desc { font-size: 11px; color: var(--text2); }
+  .kpi-conf { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+  .kpi-conf-label { font-size: 10px; color: var(--text2); }
+  .kpi-conf-bar { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; }
+  .kpi-conf-fill { height: 100%; border-radius: 2px; }
+
+  .panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-family: var(--font-h); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text1); }
+  .panel-tag { font-size: 10px; font-family: var(--font-m); border-radius: 3px; padding: 2px 6px; background: var(--bg4); color: var(--text2); }
+
+  .wind-rose-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .chart-area { position: relative; }
+
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text2); padding: 0 8px 8px; text-align: left; border-bottom: 1px solid var(--line2); font-weight: 500; }
+  .data-table td { padding: 8px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--text1); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--bg3); }
+  .td-mono { font-family: var(--font-m); font-size: 11px; }
+
+  .cond-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cond-item { display: flex; flex-direction: column; gap: 4px; }
+  .cond-label { font-size: 11px; color: var(--text2); display: flex; justify-content: space-between; }
+  .cond-label span { color: var(--text0); font-family: var(--font-m); }
+  .cond-bar { height: 4px; background: var(--bg4); border-radius: 2px; }
+  .cond-fill { height: 100%; border-radius: 2px; }
+
+  .disclaimer { font-size: 11px; color: var(--text2); background: rgba(61,127,255,0.06); border: 1px solid rgba(61,127,255,0.18); border-radius: 6px; padding: 8px 12px; display: flex; gap: 8px; align-items: flex-start; }
+  .disclaimer-icon { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+  .section-divider { display: flex; align-items: center; gap: 10px; }
+  .section-divider-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text0); white-space: nowrap; font-weight: 500; }
+  .section-divider-line { flex: 1; height: 1px; background: var(--line2); }
+
+  .dist-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .dist-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text2); }
+  .dist-ph { height: 80px; background: var(--bg3); border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: var(--font-m); color: var(--text2); text-align: center; padding: 8px; line-height: 1.5; }
+  .dist-stats { display: flex; justify-content: space-between; }
+  .dist-stat { display: flex; flex-direction: column; gap: 2px; }
+  .dist-stat-val { font-family: var(--font-m); font-size: 12px; color: var(--text0); }
+  .dist-stat-lbl { font-size: 10px; color: var(--text2); }
+
+  .heatmap-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .heatmap-panel { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .heatmap-ph { height: 200px; background: var(--bg3); border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 10px; font-family: var(--font-m); color: var(--text2); text-align: center; padding: 16px; line-height: 1.6; }
+  .heatmap-ph-icon { font-size: 20px; opacity: 0.2; margin-bottom: 2px; }
+
+  .regression-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .regression-panel { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .regression-ph { height: 130px; background: var(--bg3); border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: var(--font-m); color: var(--text2); }
+  .r2-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--bg4); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-family: var(--font-m); color: var(--text1); }
+  .r2-val { color: var(--amber); }
+  .coef-table { width: 100%; border-collapse: collapse; }
+  .coef-table th { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text2); padding: 0 8px 6px; text-align: left; border-bottom: 1px solid var(--line2); font-weight: 500; }
+  .coef-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 11px; font-family: var(--font-m); color: var(--text1); }
+  .coef-table tr:last-child td { border-bottom: none; }
+  .coef-pos { color: var(--green); }
+  .coef-neg { color: var(--red); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg1); }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+  select option { background: var(--bg2); }
+  .page-btn { background: transparent; border: 1px solid var(--line2); color: var(--text2); padding: 5px 14px; border-radius: 5px; font-family: var(--font-h); font-size: 13px; letter-spacing: 0.05em; cursor: pointer; transition: all 0.15s; }
+  .page-btn:hover { border-color: var(--accent); color: var(--text0); }
+  .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="topbar-logo">&#9928; PARK<span>CAST</span></div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-label">MLB Weather Performance Intelligence</div>
+    <div class="topbar-right">
+      <div class="status-dot"></div>
+      <div class="status-label">Model v0.1 — Placeholder</div>
+      <div class="topbar-divider"></div>
+      <button class="page-btn active" id="btn-page1" onclick="setPage(1)">&#9650; Projections</button>
+      <button class="page-btn" id="btn-page2" onclick="setPage(2)">&#128202; Analysis</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sidebar">
+      <div>
+        <div class="sidebar-section-label">Stadium</div>
+        <input class="stadium-search" type="text" placeholder="Search stadiums..." oninput="filterStadiums(this.value)">
+        <div class="stadium-list" id="stadium-list"></div>
+      </div>
+      <div class="date-block">
+        <div class="sidebar-section-label">Date &amp; Game Time</div>
+        <label>Game Date</label>
+        <input type="date" id="game-date" value="2025-07-15">
+        <label>First Pitch</label>
+        <select id="game-time">
+          <option value="13">1:05 PM</option>
+          <option value="16" selected>4:05 PM</option>
+          <option value="19">7:05 PM</option>
+          <option value="20">8:05 PM</option>
+        </select>
+      </div>
+      <div class="weather-inputs">
+        <div class="sidebar-section-label">Weather at First Pitch</div>
+        <div class="wx-row">
+          <label>Temperature (°F) <span id="temp-val">72</span></label>
+          <input type="range" min="20" max="105" value="72" id="wx-temp" oninput="updateWx()">
+        </div>
+        <div class="wx-row">
+          <label>Humidity (%) <span id="hum-val">55</span></label>
+          <input type="range" min="0" max="100" value="55" id="wx-hum" oninput="updateWx()">
+        </div>
+        <div class="wx-row">
+          <label>Wind Speed (mph) <span id="wind-val">12</span></label>
+          <input type="range" min="0" max="40" value="12" id="wx-wind" oninput="updateWx()">
+        </div>
+        <div class="wx-row">
+          <label>Wind Direction <span id="winddir-val">SW</span></label>
+          <input type="range" min="0" max="315" step="45" value="225" id="wx-winddir" oninput="updateWx()">
+        </div>
+        <div class="wx-row">
+          <label>Pressure (inHg) <span id="press-val">29.92</span></label>
+          <input type="range" min="2890" max="3050" value="2992" id="wx-press" oninput="updateWx()">
+        </div>
+      </div>
+      <button class="run-btn" onclick="runModel()">&#9654; Run Projection</button>
+    </div>
+    <div class="main" id="main-content"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const STADIUMS = [
+  { abbr:'ARI', name:'Chase Field',              team:'Diamondbacks', city:'Phoenix, AZ',        roof:true,  orientation:270,
+    blurb:"Chase Field sits in downtown Phoenix at 1,082 ft elevation. The retractable roof — closed for most summer day games when temps exceed 100°F — fundamentally decouples weather from playing conditions. When open: 330 ft LF, 407 ft CF, 334 ft RF. Natural grass. One of the most HR-friendly parks in the NL when the roof is open; air conditioning effects on ball flight are unquantified." },
+  { abbr:'ATL', name:'Truist Park',              team:'Braves',       city:'Cumberland, GA',     roof:false, orientation:180,
+    blurb:"Truist Park opened in 2017 in Cumberland, GA at ~1,050 ft elevation. Moderate symmetry: 335 ft LF, 400 ft CF, 325 ft RF. Natural grass. Warm, humid summers push HR rates up; the park plays slightly hitter-friendly. Prevailing winds off the Chattahoochee corridor are mild and inconsistent." },
+  { abbr:'BAL', name:'Camden Yards',             team:'Orioles',      city:'Baltimore, MD',      roof:false, orientation:90,
+    blurb:"Camden Yards opened in 1992 and set the template for retro ballparks. Downtown Baltimore, ~20 ft elevation. Asymmetric: 333 ft LF, 410 ft CF, 318 ft RF — the right field warehouse wall is a defining feature. Natural grass. Wind patterns from the Inner Harbor push predominantly from the southwest, often blowing out to left-center." },
+  { abbr:'BOS', name:'Fenway Park',              team:'Red Sox',      city:'Boston, MA',         roof:false, orientation:135,
+    blurb:"Fenway Park (1912) is MLB's oldest active ballpark at sea level in Kenmore Square. The Green Monster in LF stands 37 ft tall at 310 ft — the shortest LF line in MLB. CF is 420 ft to the triangle. Natural grass. Boston's marine climate produces cool, damp conditions; sea breeze from the east suppresses fly balls to right." },
+  { abbr:'CHC', name:'Wrigley Field',            team:'Cubs',         city:'Chicago, IL',        roof:false, orientation:45,
+    blurb:"Wrigley Field (1914) on Chicago's North Side. Nearly sea-level at 595 ft. Dimensions: 355 ft LF, 400 ft CF, 353 ft RF. Natural grass and ivy-covered walls. Wind off Lake Michigan is the dominant weather variable — northeast winds blow sharply in, suppressing HRs 15-20%; southwest winds blow out producing high-scoring games. The most wind-sensitive park in our dataset." },
+  { abbr:'CIN', name:'Great American Ball Park', team:'Reds',         city:'Cincinnati, OH',     roof:false, orientation:90,
+    blurb:"Great American Ball Park sits on the Ohio River waterfront in downtown Cincinnati at 490 ft elevation. Dimensions: 328 ft LF, 404 ft CF, 325 ft RF. Natural grass. River humidity elevates ball-carry in warm months. Southwesterly winds off the river corridor blow toward RF, creating a subtle HR-favorable channel." },
+  { abbr:'CLE', name:'Progressive Field',        team:'Guardians',    city:'Cleveland, OH',      roof:false, orientation:135,
+    blurb:"Progressive Field in downtown Cleveland at 653 ft elevation. Asymmetric: 325 ft LF, 405 ft CF, 325 ft RF. Natural grass. Lake Erie produces variable conditions — lake-effect cold snaps in April/May, humid summers, and strong northeast winds that can sharply suppress fly balls." },
+  { abbr:'COL', name:'Coors Field',              team:'Rockies',      city:'Denver, CO',         roof:false, orientation:45, altitude:true,
+    blurb:"Coors Field in LoDo Denver at 5,280 ft — the highest elevation in MLB by over 4,000 ft. Dimensions: 347 ft LF, 415 ft CF, 350 ft RF. Natural grass. Thin air reduces air resistance on fly balls, adding an estimated 8-10% carry vs. sea-level parks. OLS regression cannot capture elevation as a variable — it is a constant, not a covariate. Largest structural outlier in the dataset." },
+  { abbr:'CWS', name:'Guaranteed Rate Field',    team:'White Sox',    city:'Chicago, IL',        roof:false, orientation:270,
+    blurb:"Guaranteed Rate Field on Chicago's South Side at 595 ft elevation. Dimensions: 330 ft LF, 400 ft CF, 335 ft RF. Natural grass. Slightly more sheltered from Lake Michigan than Wrigley, but still subject to strong prevailing southwesterly winds. Plays more hitter-friendly than Wrigley on calm days." },
+  { abbr:'DET', name:'Comerica Park',            team:'Tigers',       city:'Detroit, MI',        roof:false, orientation:315,
+    blurb:"Comerica Park opened in 2000 in downtown Detroit at 584 ft elevation. One of the deepest CF dimensions in MLB at 420 ft; LF 345 ft, RF 330 ft. Natural grass. Historically pitcher-friendly due to deep power alleys. Lake St. Clair influence produces humid summers and cold April conditions." },
+  { abbr:'HOU', name:'Minute Maid Park',         team:'Astros',       city:'Houston, TX',        roof:true,  orientation:180,
+    blurb:"Minute Maid Park in downtown Houston at 43 ft elevation. Retractable roof closed for most of summer when heat and humidity are extreme (regularly 95°F+, 80%+ RH). When open: 315 ft LF, 435 ft CF, 326 ft RF. Natural grass. Gulf Coast humidity strongly affects ball carry when roof is open." },
+  { abbr:'KC',  name:'Kauffman Stadium',         team:'Royals',       city:'Kansas City, MO',    roof:false, orientation:90,
+    blurb:"Kauffman Stadium in Kansas City at 910 ft elevation. One of the most symmetrical parks in MLB: 330 ft LF, 410 ft CF, 330 ft RF. Natural grass with a famous water feature beyond RF. The open bowl design offers little wind shelter — Great Plains wind patterns dominate. Southerly winds push toward CF creating moderate HR-favorable conditions in summer." },
+  { abbr:'LAA', name:'Angel Stadium',            team:'Angels',       city:'Anaheim, CA',        roof:false, orientation:225,
+    blurb:"Angel Stadium in Anaheim at 160 ft elevation. Dimensions: 347 ft LF, 396 ft CF, 350 ft RF. Natural grass. Inland Southern California location means hotter, drier conditions than coastal LA — afternoon temps frequently reach 90°F+. Low humidity and warm air increase ball carry. Offshore Santa Ana winds create extreme HR-favorable conditions in fall." },
+  { abbr:'LAD', name:'Dodger Stadium',           team:'Dodgers',      city:'Los Angeles, CA',    roof:false, orientation:315,
+    blurb:"Dodger Stadium (1962) in Chavez Ravine at 512 ft elevation. Dimensions: 330 ft LF, 395 ft CF, 330 ft RF. Natural grass. The bowl shape and hillside location create a natural wind tunnel — prevailing westerly sea breezes blow in from CF, making this one of the most pitcher-friendly parks on warm evenings. Cool marine layer nights suppress HR rates." },
+  { abbr:'MIA', name:'loanDepot park',           team:'Marlins',      city:'Miami, FL',          roof:true,  orientation:180,
+    blurb:"loanDepot park (2012) in Little Havana, Miami at near sea-level. Retractable roof closed for nearly all games due to South Florida heat (90°F+) and daily afternoon thunderstorms. When open: 344 ft LF, 418 ft CF, 335 ft RF. Playing conditions are almost entirely climate-controlled; outdoor weather data is largely irrelevant when roof is closed." },
+  { abbr:'MIL', name:'American Family Field',    team:'Brewers',      city:'Milwaukee, WI',      roof:true,  orientation:315,
+    blurb:"American Family Field in Milwaukee at 636 ft elevation, with a retractable roof used frequently in April/May. When open: 344 ft LF, 400 ft CF, 345 ft RF. Natural grass. Lake Michigan produces cool, variable spring conditions. When open, prevailing westerly winds blow toward RF." },
+  { abbr:'MIN', name:'Target Field',             team:'Twins',        city:'Minneapolis, MN',    roof:false, orientation:315,
+    blurb:"Target Field in downtown Minneapolis at 830 ft elevation. Open-air park in one of MLB's most extreme climates: April games average 40°F; July games 80°F+. Dimensions: 339 ft LF, 404 ft CF, 328 ft RF. Natural grass. Temperature swing across the season is the largest in the AL." },
+  { abbr:'NYM', name:'Citi Field',               team:'Mets',         city:'Queens, NY',         roof:false, orientation:315,
+    blurb:"Citi Field in Flushing, Queens at 20 ft elevation. Dimensions: 335 ft LF, 408 ft CF, 330 ft RF. Natural grass. Exposed to Jamaica Bay and JFK Airport wind corridors — strong, variable winds from the south and southwest. Large foul territory and deep power alleys make this a pitcher-friendly park." },
+  { abbr:'NYY', name:'Yankee Stadium',           team:'Yankees',      city:'Bronx, NY',          roof:false, orientation:225,
+    blurb:"Yankee Stadium (2009) in the South Bronx at 55 ft elevation. Dimensions: 318 ft LF, 408 ft CF, 314 ft RF — the short RF porch is one of the most HR-friendly targets in MLB for left-handed hitters. Natural grass. The Harlem River corridor funnels winds from the southwest, frequently blowing out toward RF." },
+  { abbr:'OAK', name:'Oakland Coliseum',         team:'Athletics',    city:'Oakland, CA',        roof:false, orientation:45,
+    blurb:"Oakland Coliseum at 20 ft elevation near the San Francisco Bay. Dimensions: 330 ft LF, 400 ft CF, 330 ft RF. Natural grass. Strong westerly afternoon winds blow sharply in from CF, creating a pronounced HR-suppressing effect. This produces an inverted wind-runs relationship unique in our dataset: more wind = fewer runs." },
+  { abbr:'PHI', name:'Citizens Bank Park',       team:'Phillies',     city:'Philadelphia, PA',   roof:false, orientation:0,
+    blurb:"Citizens Bank Park in South Philadelphia at 20 ft elevation. Dimensions: 329 ft LF, 401 ft CF, 330 ft RF. Natural grass. One of MLB's most hitter-friendly environments — warm, humid summers with Delaware River moisture increase ball carry. Prevailing SW winds blow toward the RF gap." },
+  { abbr:'PIT', name:'PNC Park',                 team:'Pirates',      city:'Pittsburgh, PA',     roof:false, orientation:0,
+    blurb:"PNC Park on the North Shore of Pittsburgh at 730 ft elevation. Dimensions: 325 ft LF, 399 ft CF, 320 ft RF — one of the most visually dramatic settings in MLB with the Allegheny River beyond RF. Natural grass. Three Rivers geography creates complex, variable wind patterns." },
+  { abbr:'SD',  name:'Petco Park',               team:'Padres',       city:'San Diego, CA',      roof:false, orientation:315,
+    blurb:"Petco Park in the East Village, San Diego at 20 ft elevation. Dimensions: 336 ft LF, 396 ft CF, 322 ft RF, with a deep LCF power alley at 367 ft. Natural grass. Marine layer from the Pacific is the defining weather feature — June Gloom suppresses ball carry significantly. One of the most pitcher-friendly parks in the NL." },
+  { abbr:'SEA', name:'T-Mobile Park',            team:'Mariners',     city:'Seattle, WA',        roof:true,  orientation:0,
+    blurb:"T-Mobile Park in SoDo, Seattle at 10 ft elevation. Retractable roof used frequently April-June and during rain. When open: 331 ft LF, 401 ft CF, 326 ft RF. Natural grass. Pacific marine climate means cool, damp conditions with the lowest average game-time temperatures among West Coast parks." },
+  { abbr:'SF',  name:'Oracle Park',              team:'Giants',       city:'San Francisco, CA',  roof:false, orientation:0,
+    blurb:"Oracle Park sits on the waterfront at McCovey Cove in China Basin, San Francisco at sea level. Asymmetric dimensions: 339 ft LF, 399 ft CF, 309 ft RF — the short RF wall drops directly into the bay. Natural grass. Persistent westerly winds off the bay blow in from right-center at 10-20 mph for most afternoon and evening games, creating one of MLB's most consistent HR-suppressing environments. Night game temperatures frequently drop below 55°F by the 7th inning." },
+  { abbr:'STL', name:'Busch Stadium',            team:'Cardinals',    city:'St. Louis, MO',      roof:false, orientation:0,
+    blurb:"Busch Stadium in downtown St. Louis at 466 ft elevation. Dimensions: 336 ft LF, 400 ft CF, 335 ft RF. Natural grass. St. Louis sits at a continental air mass crossroads — hot, humid summers (90°F+, 70%+ RH) strongly boost ball carry, while cold April/May conditions suppress it." },
+  { abbr:'TB',  name:'Tropicana Field',          team:'Rays',         city:'St. Petersburg, FL', roof:true,  orientation:0,
+    blurb:"Tropicana Field in St. Petersburg is MLB's only fixed-dome stadium — weather is entirely irrelevant to playing conditions year-round. Dimensions: 315 ft LF, 404 ft CF, 322 ft RF. Artificial turf. Outdoor weather data should not be used to model performance here; any correlation with external conditions is spurious." },
+  { abbr:'TEX', name:'Globe Life Field',         team:'Rangers',      city:'Arlington, TX',      roof:true,  orientation:180,
+    blurb:"Globe Life Field (2020) in Arlington at 571 ft elevation. Retractable roof designed to remain closed for much of the Texas summer — outdoor temperatures regularly exceed 105°F. When open: 329 ft LF, 407 ft CF, 326 ft RF. Natural grass. Climate-controlled interior makes this a structural outlier similar to Chase Field." },
+  { abbr:'TOR', name:'Rogers Centre',            team:'Blue Jays',    city:'Toronto, ON',        roof:true,  orientation:0,
+    blurb:"Rogers Centre in downtown Toronto at 287 ft elevation. Fixed retractable roof — closed for the vast majority of games. Dimensions: 328 ft LF, 400 ft CF, 328 ft RF. Artificial turf. Outdoor weather has minimal bearing on playing conditions; outdoor weather modeling applies only to the rare open-roof games." },
+  { abbr:'WSH', name:'Nationals Park',           team:'Nationals',    city:'Washington, DC',     roof:false, orientation:0,
+    blurb:"Nationals Park in the Capitol Riverfront neighborhood, Washington DC at 10 ft elevation. Dimensions: 336 ft LF, 402 ft CF, 335 ft RF. Natural grass. DC summers are among the most extreme in the NL East — high heat (90°F+) and humidity off the Potomac and Anacostia rivers significantly boost ball carry." },
+];
+
+let activeStadium = 24; // Oracle Park
+let projections = null;
+let currentPage = 1;
+
+function setPage(n) {
+  currentPage = n;
+  document.getElementById('btn-page1').classList.toggle('active', n === 1);
+  document.getElementById('btn-page2').classList.toggle('active', n === 2);
+  renderMain();
+}
+
+const DIRS = ['N','NE','E','SE','S','SW','W','NW'];
+function dirLabel(deg) { return DIRS[Math.round(deg/45) % 8]; }
+
+function filterStadiums(q) {
+  const lower = q.toLowerCase();
+  document.querySelectorAll('.stadium-item').forEach((el, i) => {
+    const s = STADIUMS[i];
+    const match = !q || s.name.toLowerCase().includes(lower) || s.team.toLowerCase().includes(lower) || s.city.toLowerCase().includes(lower) || s.abbr.toLowerCase().includes(lower);
+    el.classList.toggle('hidden', !match);
+  });
+}
+
+function updateWx() {
+  document.getElementById('temp-val').textContent    = document.getElementById('wx-temp').value;
+  document.getElementById('hum-val').textContent     = document.getElementById('wx-hum').value;
+  document.getElementById('wind-val').textContent    = document.getElementById('wx-wind').value;
+  const dd = +document.getElementById('wx-winddir').value;
+  document.getElementById('winddir-val').textContent = DIRS[Math.round(dd/45)%8];
+  const pr = +document.getElementById('wx-press').value;
+  document.getElementById('press-val').textContent   = (pr/100).toFixed(2);
+}
+
+function getWx() {
+  return {
+    temp:    +document.getElementById('wx-temp').value,
+    hum:     +document.getElementById('wx-hum').value,
+    wind:    +document.getElementById('wx-wind').value,
+    winddir: +document.getElementById('wx-winddir').value,
+    press:   +document.getElementById('wx-press').value / 100,
+    date:    document.getElementById('game-date').value,
+    hour:    +document.getElementById('game-time').value,
+  };
+}
+
+function computeProjection(wx, stadium) {
+  // PLACEHOLDER model — replace with trained per-stadium OLS/ML outputs
+  const tempDelta   = (wx.temp - 72) / 10;
+  const humDelta    = (wx.hum - 50) / 20;
+  const pressEffect = (wx.press - 29.92) * -8;
+  const windEffect  = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
+
+  const hrDelta   = +(tempDelta * 0.18 + windEffect.outBlow * 0.15 + pressEffect * 0.04).toFixed(2);
+  const hitsDelta = +(tempDelta * 0.11 + humDelta * 0.06).toFixed(2);
+  const kDelta    = +(humDelta * -0.08 + tempDelta * 0.05).toFixed(2);
+  const runsDelta = +(hrDelta * 0.62 + hitsDelta * 0.31).toFixed(2);
+
+  const hrConf   = Math.min(0.95, 0.55 + Math.abs(hrDelta) * 0.2);
+  const hitsConf = Math.min(0.90, 0.55 + Math.abs(hitsDelta) * 0.15);
+  const kConf    = Math.min(0.88, 0.50 + Math.abs(kDelta) * 0.12);
+
+  return { hrDelta, hitsDelta, kDelta, runsDelta, hrConf, hitsConf, kConf, windEffect };
+}
+
+function computeWindEffect(speed, dir, stadiumOrientation) {
+  const rel = ((dir - stadiumOrientation) + 360) % 360;
+  const radians = rel * Math.PI / 180;
+  const outComponent   = Math.cos(radians);
+  const crossComponent = Math.sin(radians);
+  return {
+    outBlow: +(outComponent * speed).toFixed(1),
+    cross:   +(crossComponent * speed).toFixed(1),
+    label: outComponent > 0.5 ? 'Blowing out' : outComponent < -0.5 ? 'Blowing in' : 'Crosswind',
+    rel
+  };
+}
+
+function fmtDelta(v, d=2) { return (v >= 0 ? '+' : '') + v.toFixed(d); }
+function kpiClass(v) { return v > 0.05 ? 'up' : v < -0.05 ? 'down' : 'neutral'; }
+
+function renderStadiumList() {
+  const el = document.getElementById('stadium-list');
+  el.innerHTML = STADIUMS.map((s, i) => `
+    <div class="stadium-item ${i===activeStadium?'active':''}" onclick="selectStadium(${i})">
+      <div class="stadium-abbr">${s.abbr}</div>
+      <div class="stadium-meta">
+        <div class="stadium-name">${s.team}</div>
+        <div class="stadium-city">${s.city}</div>
+      </div>
+      ${s.roof ? '<div class="stadium-roof">ROOF</div>' : ''}
+    </div>
+  `).join('');
+}
+
+function selectStadium(i) {
+  activeStadium = i;
+  projections = null;
+  renderStadiumList();
+  renderMain();
+}
+
+function runModel() {
+  projections = computeProjection(getWx(), STADIUMS[activeStadium]);
+  renderMain();
+}
+
+function renderMain() {
+  const wx = getWx();
+  const stadium = STADIUMS[activeStadium];
+  const p = projections || computeProjection(wx, stadium);
+  const todayPF = Math.round(100 + p.runsDelta * 4 + p.windEffect.outBlow * 0.5);
+  const pfDelta = todayPF - 100;
+  const pfColor = pfDelta > 2 ? 'var(--green)' : pfDelta < -2 ? 'var(--red)' : 'var(--text1)';
+
+  document.getElementById('main-content').innerHTML = `
+    <div class="stadium-header">
+      <div class="stadium-title-block">
+        <div class="stadium-title">${stadium.name}</div>
+        <div class="stadium-subtitle">${stadium.team} · ${stadium.city}</div>
+        ${stadium.blurb ? `<div class="stadium-blurb">${stadium.blurb}</div>` : ''}
+        <div class="context-badges">
+          <span class="badge badge-blue">${wx.date}</span>
+          <span class="badge badge-amber">${wx.temp}°F · ${wx.hum}% RH</span>
+          <span class="badge badge-wind">Wind ${wx.wind} mph ${dirLabel(wx.winddir)} · ${p.windEffect.label}</span>
+          <span class="badge badge-blue">${wx.press.toFixed(2)} inHg</span>
+          ${stadium.roof ? '<span class="badge badge-red">RETRACTABLE ROOF — weather may not reflect playing conditions</span>' : ''}
+          ${stadium.altitude ? '<span class="badge badge-amber">HIGH ALTITUDE — constant air density effect not captured in regression</span>' : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <div class="disclaimer-icon">&#9432;</div>
+      <div>Projections are generated by a <strong>placeholder linear model</strong> (OLS, R² ≈ 2–13%). Replace with trained per-stadium models once the full pipeline is complete. Values shown are directional estimates — not calibrated predictions.</div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="kpi-row">
+      ${kpiCard('HR deviation',   fmtDelta(p.hrDelta)+' per game',   p.hrDelta,   'vs. park avg baseline',   p.hrConf,                          '#34c77b')}
+      ${kpiCard('Hits deviation', fmtDelta(p.hitsDelta)+' per game', p.hitsDelta, 'total hits vs. baseline', p.hitsConf,                        '#40b4e5')}
+      ${kpiCard('K deviation',    fmtDelta(p.kDelta)+' per game',    p.kDelta,    'strikeouts vs. baseline', p.kConf,                           '#f5c842')}
+      ${kpiCard('Runs deviation', fmtDelta(p.runsDelta)+' per game', p.runsDelta, 'total runs vs. baseline', Math.min(p.hrConf,p.hitsConf)*0.9, '#f5803e')}
+      ${kpiCard('Wind factor', fmtDelta(p.windEffect.outBlow,1)+' mph out', p.windEffect.outBlow, p.windEffect.label+' · '+Math.abs(p.windEffect.cross).toFixed(1)+' mph cross', 0.82, '#9b6fff')}
+    </div>
+
+    <!-- PARK FACTOR ROW -->
+    <div class="panel-row">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Predicted Park Factor</div>
+          <div class="panel-tag">Today · Placeholder model</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0">
+          <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${pfColor}">${todayPF}</div>
+          <div style="font-size:12px;color:var(--text2)">${pfDelta >= 0 ? '+' : ''}${pfDelta} vs. neutral (100)</div>
+          <div style="font-size:10px;color:var(--text2);text-align:center;max-width:240px;line-height:1.6;font-family:var(--font-m)">
+            PLACEHOLDER — replace with real model output.<br>Real definition: (home runs scored / away runs scored) × 100
+          </div>
+        </div>
+        <div class="kpi-conf">
+          <div class="kpi-conf-label">Conf.</div>
+          <div class="kpi-conf-bar"><div class="kpi-conf-fill" style="width:${Math.round(Math.min(p.hrConf,p.hitsConf)*90)}%;background:#34c77b"></div></div>
+          <div class="kpi-conf-label" style="min-width:28px">${Math.round(Math.min(p.hrConf,p.hitsConf)*90)}%</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Historical Park Factor</div>
+          <div class="panel-tag">2020–2025 · Placeholder data</div>
+        </div>
+        <div class="chart-area" style="height:160px;">
+          <canvas id="pf-chart"></canvas>
+        </div>
+        <div style="font-size:11px;color:var(--text2)">
+          Bars = historical game-level park factor. Amber line = today's projection (${todayPF}).
+          <!-- PLACEHOLDER: replace simulated bars with real per-game park factor
+               from your Statcast data: (home runs scored / away runs scored) × 100 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 1 ONLY: wind/scatter, condition breakdown, analogs, cross-stadium -->
+    ${currentPage === 1 ? `
+
+    <div class="panel-row">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Wind Analysis</div>
+          <div class="panel-tag">Relative to CF</div>
+        </div>
+        <div class="wind-rose-wrap">
+          <canvas id="wind-rose" width="220" height="220"></canvas>
+          <div style="font-size:11px;color:var(--text2);text-align:center">
+            Wind ${wx.wind} mph from ${dirLabel(wx.winddir)} · Outfield orientation ${stadium.orientation}°
+            <br><span style="color:${p.windEffect.outBlow>0?'var(--warm)':'var(--cold)'}">
+              ${p.windEffect.outBlow>0?'Blowing out (HR-favorable)':'Blowing in (HR-suppressing)'}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Temperature vs HR:H Ratio</div>
+          <div class="panel-tag">Night games · OLS fit</div>
+        </div>
+        <div class="chart-area" style="height:200px">
+          <canvas id="scatter-chart"></canvas>
+        </div>
+        <div style="font-size:11px;color:var(--text2)">Simulated scatter around OLS trend line. Each point = one game. &#9733; = current projection.</div>
+      </div>
+    </div>
+
+    <div class="panel-row">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Condition Breakdown</div>
+          <div class="panel-tag">Driver weights (placeholder)</div>
+        </div>
+        <div class="cond-grid">
+          ${condBar('Temperature signal',    Math.abs(p.hrDelta)*40+30,                         wx.temp>80?'#f5803e':wx.temp<55?'#40b4e5':'#5e6e8a', wx.temp+'°F')}
+          ${condBar('Wind out-component',    Math.min(100,Math.abs(p.windEffect.outBlow)*5+20), '#9b6fff', p.windEffect.outBlow.toFixed(1)+' mph')}
+          ${condBar('Humidity effect',       Math.abs(p.hitsDelta)*50+20,                       '#40b4e5', wx.hum+'%')}
+          ${condBar('Pressure suppression',  Math.min(100,Math.abs(wx.press-29.92)*200+15),     '#f5c842', wx.press.toFixed(2)+' inHg')}
+          ${condBar('HR:H model confidence', Math.round(p.hrConf*100),                          '#34c77b', Math.round(p.hrConf*100)+'%')}
+          ${condBar('Adj R² (model fit)',    Math.round((0.02+Math.abs(p.hrDelta)*0.15)*100),   '#3d7fff', ((0.02+Math.abs(p.hrDelta)*0.15)*100).toFixed(1)+'%')}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Historical Analogs</div>
+          <div class="panel-tag">Similar conditions · Placeholder data</div>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Date</th><th>Temp</th><th>Wind</th><th>HR</th><th>Hits</th><th>K</th><th>Runs</th>
+          </tr></thead>
+          <tbody id="analog-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Cross-Stadium HR Deviation — Same Conditions</div>
+        <div class="panel-tag">All 30 stadiums · Placeholder model</div>
+      </div>
+      <div class="chart-area" style="height:140px;">
+        <canvas id="cross-chart"></canvas>
+      </div>
+    </div>
+
+    ` : ''}
+
+    <!-- PAGE 2 ONLY: seasonal distributions, heatmaps, regression -->
+    ${currentPage === 2 ? `
+
+    <div class="section-divider">
+      <div class="section-divider-label">Seasonal Weather Distributions</div>
+      <div class="section-divider-line"></div>
+      <div class="panel-tag">2020–2025 · game-time hourly · MOCK DATA</div>
+    </div>
+    <div class="dist-row">
+      <div class="dist-card">
+        <div class="dist-label">Temperature (°F)</div>
+        <div style="position:relative;height:80px"><canvas id="dist-temp"></canvas></div>
+        <div class="dist-stats">
+          <div class="dist-stat"><div class="dist-stat-val">58°F</div><div class="dist-stat-lbl">median</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">50–66°F</div><div class="dist-stat-lbl">IQR</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">±8°F</div><div class="dist-stat-lbl">std dev</div></div>
+        </div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Pressure (hPa)</div>
+        <div style="position:relative;height:80px"><canvas id="dist-press"></canvas></div>
+        <div class="dist-stats">
+          <div class="dist-stat"><div class="dist-stat-val">1013 hPa</div><div class="dist-stat-lbl">median</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">1010–1016</div><div class="dist-stat-lbl">IQR</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">±4 hPa</div><div class="dist-stat-lbl">std dev</div></div>
+        </div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Humidity (%)</div>
+        <div style="position:relative;height:80px"><canvas id="dist-hum"></canvas></div>
+        <div class="dist-stats">
+          <div class="dist-stat"><div class="dist-stat-val">74%</div><div class="dist-stat-lbl">median</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">63–83%</div><div class="dist-stat-lbl">IQR</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">±13%</div><div class="dist-stat-lbl">std dev</div></div>
+        </div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Wind Speed (mph)</div>
+        <div style="position:relative;height:80px"><canvas id="dist-wind"></canvas></div>
+        <div class="dist-stats">
+          <div class="dist-stat"><div class="dist-stat-val">14 mph</div><div class="dist-stat-lbl">median</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">10–18 mph</div><div class="dist-stat-lbl">IQR</div></div>
+          <div class="dist-stat"><div class="dist-stat-val">±6 mph</div><div class="dist-stat-lbl">std dev</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <div class="section-divider-label">Weather Bin Heatmaps</div>
+      <div class="section-divider-line"></div>
+      <div class="panel-tag">Diff from mean · Away stats · 2020–2025 · MOCK DATA</div>
+    </div>
+    <div class="heatmap-row">
+      <div class="heatmap-panel">
+        <div class="panel-header"><div class="panel-title">Away Stats by Temperature</div><div class="panel-tag">Diff from mean</div></div>
+        <canvas id="hm-temp" height="180"></canvas>
+      </div>
+      <div class="heatmap-panel">
+        <div class="panel-header"><div class="panel-title">Away Stats by Pressure</div><div class="panel-tag">Diff from mean</div></div>
+        <canvas id="hm-press" height="180"></canvas>
+      </div>
+      <div class="heatmap-panel">
+        <div class="panel-header"><div class="panel-title">Away Stats by Humidity</div><div class="panel-tag">Diff from mean</div></div>
+        <canvas id="hm-hum" height="180"></canvas>
+      </div>
+      <div class="heatmap-panel">
+        <div class="panel-header"><div class="panel-title">Away Stats by Wind Speed</div><div class="panel-tag">Diff from mean</div></div>
+        <canvas id="hm-wind" height="180"></canvas>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <div class="section-divider-label">Regression Analysis</div>
+      <div class="section-divider-line"></div>
+      <div class="panel-tag">OLS · Game-level · 2020–2025 · MOCK DATA</div>
+    </div>
+    <div class="regression-grid">
+      <div class="regression-panel">
+        <div class="panel-header">
+          <div class="panel-title">HR:H Ratio — OLS Model</div>
+          <div class="r2-badge">Adj R² <span class="r2-val">0.08</span></div>
+        </div>
+        <div style="position:relative;height:130px"><canvas id="reg-hrh"></canvas></div>
+        <table class="coef-table">
+          <thead><tr><th>Variable</th><th>Coef.</th><th>Std Err</th><th>p-value</th></tr></thead>
+          <tbody>
+            <tr><td>Temperature</td><td class="coef-pos">+0.0018</td><td>0.0006</td><td>0.003</td></tr>
+            <tr><td>Wind speed</td><td class="coef-neg">−0.0021</td><td>0.0008</td><td>0.011</td></tr>
+            <tr><td>Humidity</td><td class="coef-neg">−0.0009</td><td>0.0007</td><td>0.198</td></tr>
+            <tr><td>Pressure</td><td class="coef-neg">−0.0034</td><td>0.0012</td><td>0.006</td></tr>
+            <tr><td>const</td><td>+0.214</td><td>0.031</td><td>&lt;0.001</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="regression-panel">
+        <div class="panel-header">
+          <div class="panel-title">Total Runs — OLS Model</div>
+          <div class="r2-badge">Adj R² <span class="r2-val">0.05</span></div>
+        </div>
+        <div style="position:relative;height:130px"><canvas id="reg-runs"></canvas></div>
+        <table class="coef-table">
+          <thead><tr><th>Variable</th><th>Coef.</th><th>Std Err</th><th>p-value</th></tr></thead>
+          <tbody>
+            <tr><td>Temperature</td><td class="coef-pos">+0.042</td><td>0.018</td><td>0.021</td></tr>
+            <tr><td>Wind speed</td><td class="coef-neg">−0.031</td><td>0.022</td><td>0.162</td></tr>
+            <tr><td>Humidity</td><td class="coef-neg">−0.018</td><td>0.019</td><td>0.344</td></tr>
+            <tr><td>Pressure</td><td class="coef-neg">−0.071</td><td>0.029</td><td>0.015</td></tr>
+            <tr><td>const</td><td>+8.94</td><td>1.12</td><td>&lt;0.001</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    ` : ''}
+  `;
+
+  renderParkFactorChart(p);
+  if (currentPage === 1) {
+    renderWindRose(wx, stadium, p);
+    renderScatter(wx, p);
+    renderAnalogTable(wx);
+    renderCrossChart(wx);
+  }
+  if (currentPage === 2) {
+    renderDistCharts();
+    renderHeatmaps();
+    renderRegressionScatters();
+  }
+}
+
+// ── MOCK DATA helpers ──────────────────────────────────────────────
+// All values below are illustrative mock data.
+// Replace by passing in real computed arrays from your Python pipeline.
+
+function gaussianBins(mean, std, bins) {
+  return bins.map(x => {
+    const exponent = -0.5 * Math.pow((x - mean) / std, 2);
+    return +(Math.exp(exponent) * 100 + (Math.random() - 0.5) * 4).toFixed(1);
+  });
+}
+
+function renderDistCharts() {
+  const cfg = (labels, data, color) => ({
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
+        y: { display: false }
+      }
+    }
+  });
+
+  // Temperature: Oracle Park skewed cool, peaks ~57-60°F
+  const tempBins = ['46','50','54','58','62','66','70','74'];
+  const tempData = gaussianBins(58, 7, tempBins.map(Number));
+  new Chart(document.getElementById('dist-temp'), cfg(tempBins, tempData, '#40b4e5'));
+
+  // Pressure: tight normal around 1013 hPa
+  const pressBins = ['1007','1009','1011','1013','1015','1017','1019'];
+  const pressData = gaussianBins(1013, 3, pressBins.map(Number));
+  new Chart(document.getElementById('dist-press'), cfg(pressBins, pressData, '#9b6fff'));
+
+  // Humidity: Oracle high humidity, right-skewed toward 80-90%
+  const humBins = ['45','55','60','65','70','75','80','85','90'];
+  const humData = gaussianBins(74, 12, humBins.map(Number));
+  new Chart(document.getElementById('dist-hum'), cfg(humBins, humData, '#34c77b'));
+
+  // Wind: Oracle strong right tail from bay winds
+  const windBins = ['0-4','5-8','9-12','13-16','17-20','21-25','26+'];
+  const windData = [8, 14, 22, 28, 18, 7, 3].map(v => v + (Math.random()-0.5)*3);
+  new Chart(document.getElementById('dist-wind'), cfg(windBins, windData, '#f5803e'));
+}
+
+function renderHeatmaps() {
+  // Mock diff-from-mean values per stat × bin
+  // Rows: Runs, HR, K, Walks, HR:H  |  Cols: quintile bins (Q1–Q5)
+  const stats = ['Runs','HR','K','Walks','HR:H'];
+
+  // Temperature heatmap: warm = more offense
+  const hmTemp = [
+    [-0.3, -0.1,  0.0,  0.2,  0.3],
+    [-0.04,-0.02, 0.01, 0.07, 0.13],
+    [ 0.1,  0.0, -0.1, -0.2, -0.3],
+    [-0.1,  0.0,  0.1,  0.1,  0.2],
+    [-0.015,-0.006,0.001,0.007,0.016]
+  ];
+  // Pressure heatmap: high pressure suppresses HR
+  const hmPress = [
+    [ 0.2,  0.1,  0.0, -0.2, -0.5],
+    [ 0.07, 0.04,-0.03,-0.05,-0.11],
+    [-0.2, -0.1,  0.3,  0.2,  0.0],
+    [ 0.1,  0.1, -0.0, -0.1, -0.1],
+    [ 0.014,0.006,-0.011,-0.006,0.000]
+  ];
+  // Humidity: mild suppression
+  const hmHum = [
+    [ 0.6, -0.2,  0.0, -0.3, -0.2],
+    [ 0.10, 0.12,-0.13,-0.06,-0.03],
+    [-0.0, -0.1,  0.2,  0.0, -0.0],
+    [-0.1, -0.0, -0.0,  0.1,  0.0],
+    [-0.000,0.007,-0.016,0.005,0.005]
+  ];
+  // Wind speed: higher wind suppresses HR at Oracle
+  const hmWind = [
+    [ 0.3,  0.1,  0.1, -0.1, -0.4],
+    [ 0.07, 0.10,-0.11,-0.04,-0.03],
+    [-0.2, -0.3,  0.2,  0.2,  0.2],
+    [-0.0,  0.1,  0.1,  0.0, -0.2],
+    [-0.003,0.004,-0.014,0.006,0.006]
+  ];
+
+  const binLabels = ['Q1','Q2','Q3','Q4','Q5'];
+
+  [
+    ['hm-temp', hmTemp, ['<50°F','50-55°F','55-60°F','60-66°F','>66°F']],
+    ['hm-press', hmPress, ['<1009','1009-11','1011-13','1013-15','>1015']],
+    ['hm-hum', hmHum, ['<55%','55-65%','65-75%','75-83%','>83%']],
+    ['hm-wind', hmWind, ['4-8mph','8-11mph','11-14mph','14-18mph','>18mph']],
+  ].forEach(([id, matrix, colLabels]) => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+
+    // Draw heatmap manually on canvas
+    const ctx = canvas.getContext('2d');
+    const W = canvas.parentElement.clientWidth || 400;
+    const H = 180;
+    canvas.width = W; canvas.height = H;
+
+    const rows = stats.length, cols = colLabels.length;
+    const padLeft = 52, padTop = 22, padBottom = 24, padRight = 8;
+    const cellW = (W - padLeft - padRight) / cols;
+    const cellH = (H - padTop - padBottom) / rows;
+
+    // Find max abs val for color scaling
+    const allVals = matrix.flat();
+    const maxAbs = Math.max(...allVals.map(Math.abs), 0.001);
+
+    matrix.forEach((row, r) => {
+      row.forEach((val, c) => {
+        const intensity = Math.min(Math.abs(val) / maxAbs, 1);
+        const alpha = 0.15 + intensity * 0.75;
+        ctx.fillStyle = val > 0
+          ? `rgba(232,80,80,${alpha.toFixed(2)})`
+          : `rgba(64,180,229,${alpha.toFixed(2)})`;
+        ctx.fillRect(padLeft + c*cellW + 1, padTop + r*cellH + 1, cellW - 2, cellH - 2);
+
+        // Value label
+        ctx.fillStyle = intensity > 0.5 ? '#fff' : '#a8b2c8';
+        ctx.font = `9px DM Mono,monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const label = val > 0 ? '+'+val.toFixed(2) : val.toFixed(2);
+        ctx.fillText(label, padLeft + c*cellW + cellW/2, padTop + r*cellH + cellH/2);
+      });
+    });
+
+    // Row labels
+    ctx.fillStyle = '#a8b2c8'; ctx.font = '9px Barlow,sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    stats.forEach((s, r) => {
+      ctx.fillText(s, padLeft - 4, padTop + r*cellH + cellH/2);
+    });
+
+    // Col labels
+    ctx.fillStyle = '#5e6e8a'; ctx.font = '8px DM Mono,monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    colLabels.forEach((l, c) => {
+      ctx.fillText(l, padLeft + c*cellW + cellW/2, padTop + rows*cellH + 3);
+    });
+
+    // Legend
+    ctx.fillStyle = 'rgba(232,80,80,0.7)'; ctx.fillRect(W - padRight - 80, 4, 10, 10);
+    ctx.fillStyle = '#a8b2c8'; ctx.font = '8px DM Mono,monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('above avg', W - padRight - 68, 9);
+    ctx.fillStyle = 'rgba(64,180,229,0.7)'; ctx.fillRect(W - padRight - 80, 16, 10, 10);
+    ctx.fillText('below avg', W - padRight - 68, 21);
+  });
+}
+
+function renderRegressionScatters() {
+  const makeScatter = (canvasId, mean, spread, slope, intercept) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (canvas._chart) canvas._chart.destroy();
+    const pts = Array.from({length: 80}, () => {
+      const x = mean + (Math.random()-0.5)*spread*2;
+      const y = intercept + slope*x + (Math.random()-0.5)*spread*0.18;
+      return { x: +x.toFixed(2), y: +y.toFixed(3) };
+    });
+    const lineX = [mean - spread, mean + spread];
+    const lineY = lineX.map(x => intercept + slope*x);
+    canvas._chart = new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          { label:'Games', data: pts, backgroundColor:'rgba(61,127,255,0.25)', pointRadius:3 },
+          { label:'OLS fit', data:[{x:lineX[0],y:lineY[0]},{x:lineX[1],y:lineY[1]}],
+            type:'line', borderColor:'#f5c842', borderWidth:1.5, pointRadius:0, tension:0 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ title:{display:true,text:'Predicted',color:'#5e6e8a',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#5e6e8a',font:{size:9}} },
+          y:{ title:{display:true,text:'Actual',color:'#5e6e8a',font:{size:9}},    grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#5e6e8a',font:{size:9}} }
+        }
+      }
+    });
+  };
+  // HR:H scatter: predicted vs actual HR:H ratio
+  makeScatter('reg-hrh', 0.235, 0.04, 0.82, 0.040);
+  // Runs scatter: predicted vs actual total runs
+  makeScatter('reg-runs', 8.8, 2.2, 0.74, 2.3);
+}
+
+function kpiCard(label, val, raw, desc, conf, confColor) {
+  const cls = kpiClass(raw);
+  return `
+  <div class="kpi-card ${cls}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value ${cls}">${val}</div>
+    <div class="kpi-desc">${desc}</div>
+    <div class="kpi-conf">
+      <div class="kpi-conf-label">Conf.</div>
+      <div class="kpi-conf-bar"><div class="kpi-conf-fill" style="width:${Math.round(conf*100)}%;background:${confColor}"></div></div>
+      <div class="kpi-conf-label" style="min-width:28px">${Math.round(conf*100)}%</div>
+    </div>
+  </div>`;
+}
+
+function condBar(label, pct, color, valStr) {
+  return `
+  <div class="cond-item">
+    <div class="cond-label">${label} <span>${valStr}</span></div>
+    <div class="cond-bar"><div class="cond-fill" style="width:${Math.round(pct)}%;background:${color}"></div></div>
+  </div>`;
+}
+
+function renderWindRose(wx, stadium, p) {
+  const canvas = document.getElementById('wind-rose');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 110, cy = 110, R = 90;
+  ctx.clearRect(0, 0, 220, 220);
+
+  for (let r = R/3; r <= R; r += R/3) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5; ctx.stroke();
+  }
+  const dirs8 = ['N','NE','E','SE','S','SW','W','NW'];
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4 - Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a)*R, cy + Math.sin(a)*R);
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 0.5; ctx.stroke();
+    ctx.fillStyle = '#5e6e8a'; ctx.font = '10px DM Mono,monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(dirs8[i], cx + Math.cos(a)*(R+14), cy + Math.sin(a)*(R+14));
+  }
+
+  const outfieldAngle = (stadium.orientation - 90) * Math.PI / 180;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(outfieldAngle)*20, cy + Math.sin(outfieldAngle)*20);
+  ctx.lineTo(cx + Math.cos(outfieldAngle)*R*0.95, cy + Math.sin(outfieldAngle)*R*0.95);
+  ctx.strokeStyle = 'rgba(61,127,255,0.35)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(61,127,255,0.7)'; ctx.font = '9px DM Mono,monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('CF', cx + Math.cos(outfieldAngle)*R*0.65, cy + Math.sin(outfieldAngle)*R*0.65);
+
+  const windAngleRad = (wx.winddir - 90) * Math.PI / 180;
+  const windLen = (wx.wind / 40) * R * 0.85;
+  const arrowColor = p.windEffect.outBlow > 2 ? '#f5803e' : p.windEffect.outBlow < -2 ? '#40b4e5' : '#9b6fff';
+
+  if (wx.wind > 0) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(windAngleRad)*windLen, cy + Math.sin(windAngleRad)*windLen);
+    ctx.strokeStyle = arrowColor; ctx.lineWidth = 2.5; ctx.stroke();
+    const ex = cx + Math.cos(windAngleRad)*windLen;
+    const ey = cy + Math.sin(windAngleRad)*windLen;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(windAngleRad+2.5)*8, ey + Math.sin(windAngleRad+2.5)*8);
+    ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(windAngleRad-2.5)*8, ey + Math.sin(windAngleRad-2.5)*8);
+    ctx.strokeStyle = arrowColor; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2);
+  ctx.fillStyle = '#e8ecf4'; ctx.fill();
+}
+
+function renderScatter(wx, p) {
+  const canvas = document.getElementById('scatter-chart');
+  if (!canvas) return;
+  if (window._scatterChart) { window._scatterChart.destroy(); }
+  const pts = [];
+  for (let i = 0; i < 60; i++) {
+    const t  = 55 + Math.random()*40;
+    const hr = 0.18 + t/10*0.01 + (Math.random()-0.5)*0.06;
+    pts.push({ x: +t.toFixed(1), y: +hr.toFixed(3) });
+  }
+  const curHR = 0.18 + wx.temp/10*0.01 + p.hrDelta*0.05;
+  window._scatterChart = new Chart(canvas, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label:'Historical games',   data: pts, backgroundColor:'rgba(61,127,255,0.3)', pointRadius:3, pointHoverRadius:5 },
+        { label:'Current projection', data:[{x:wx.temp, y:+curHR.toFixed(3)}], backgroundColor:'#f5c842', pointRadius:8, pointStyle:'star' },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.parsed.x}°F, HR:H ${ctx.parsed.y.toFixed(3)}` } } },
+      scales:{
+        x:{ title:{display:true,text:'Temperature (°F)',color:'#5e6e8a',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#5e6e8a',font:{size:10}} },
+        y:{ title:{display:true,text:'HR:H ratio',color:'#5e6e8a',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#5e6e8a',font:{size:10}} }
+      }
+    }
+  });
+}
+
+function renderAnalogTable(wx) {
+  const tbody = document.getElementById('analog-tbody');
+  if (!tbody) return;
+  const rows = [];
+  for (let i = 0; i < 6; i++) {
+    const dt   = new Date(2022+Math.floor(Math.random()*3), Math.floor(Math.random()*7)+3, Math.floor(Math.random()*28)+1);
+    const t    = (wx.temp + (Math.random()-0.5)*8).toFixed(0);
+    const w    = Math.max(0, wx.wind + (Math.random()-0.5)*5).toFixed(0);
+    const hr   = (Math.random()*2+1.5).toFixed(0);
+    const hits = (Math.random()*6+6).toFixed(0);
+    const k    = (Math.random()*5+7).toFixed(0);
+    const runs = (Math.random()*4+5).toFixed(0);
+    rows.push(`<tr>
+      <td class="td-mono" style="color:var(--text2)">${dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td class="td-mono">${t}°F</td>
+      <td class="td-mono">${w} mph</td>
+      <td class="td-mono">${hr}</td>
+      <td class="td-mono">${hits}</td>
+      <td class="td-mono">${k}</td>
+      <td class="td-mono">${runs}</td>
+    </tr>`);
+  }
+  tbody.innerHTML = rows.join('');
+}
+
+function renderCrossChart(wx) {
+  const canvas = document.getElementById('cross-chart');
+  if (!canvas) return;
+  if (window._crossChart) { window._crossChart.destroy(); }
+  const deltas = STADIUMS.map((s, i) => ({
+    label:  s.abbr,
+    val:    computeProjection(wx, s).hrDelta,
+    active: i === activeStadium
+  }));
+  window._crossChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: deltas.map(d => d.label),
+      datasets:[{
+        label: 'HR deviation',
+        data:  deltas.map(d => d.val),
+        backgroundColor: deltas.map(d => d.active ? '#f5c842' : d.val > 0 ? 'rgba(52,199,123,0.5)' : 'rgba(232,80,80,0.45)'),
+        borderRadius: 3,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:'#5e6e8a',font:{size:9}, maxRotation:45} },
+        y:{ grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#5e6e8a',font:{size:10}}, title:{display:true,text:'HR delta per game',color:'#5e6e8a',font:{size:10}} }
+      }
+    }
+  });
+}
+
+function renderParkFactorChart(p) {
+  const canvas = document.getElementById('pf-chart');
+  if (!canvas) return;
+  if (window._pfChart) { window._pfChart.destroy(); }
+
+  // PLACEHOLDER: simulated historical park factors per game (2020-2025).
+  // Replace with real per-game park factor values from your Statcast data.
+  const seed = activeStadium * 7;
+  const hist = Array.from({length: 60}, (_, i) => {
+    const noise = Math.sin(seed + i * 0.7) * 6 + (Math.random() - 0.5) * 8;
+    return Math.round(100 + noise);
+  });
+  const todayPF = Math.round(100 + p.runsDelta * 4 + p.windEffect.outBlow * 0.5);
+
+  window._pfChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: hist.map((_, i) => `G${i+1}`),
+      datasets: [
+        {
+          label: 'Historical park factor',
+          data: hist,
+          backgroundColor: hist.map(v => v > 100 ? 'rgba(52,199,123,0.35)' : 'rgba(232,80,80,0.35)'),
+          borderRadius: 2,
+          order: 2,
+        },
+        {
+          label: "Today's projection",
+          data: hist.map(() => todayPF),
+          type: 'line',
+          borderColor: '#f5c842',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `Game ${items[0].dataIndex + 1}`,
+            label: (ctx) => ctx.dataset.label + ': ' + ctx.parsed.y
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#5e6e8a', font: { size: 10 } },
+          title: { display: true, text: 'Park factor', color: '#5e6e8a', font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+renderStadiumList();
+renderMain();
+</script>
+</body>
+</html>
