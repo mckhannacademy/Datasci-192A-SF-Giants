@@ -1,0 +1,31 @@
+team_code,stadium_name,team_name,roof_type,setting
+AZ,Chase Field,Diamondbacks,retractable,urban
+ATH,Oakland Coliseum,Athletics,open_air,suburban
+ATL,Truist Park,Braves,open_air,suburban
+BAL,Camden Yards,Orioles,open_air,urban
+BOS,Fenway Park,Red Sox,open_air,urban
+CHC,Wrigley Field,Cubs,open_air,urban
+CIN,Great American Ball Park,Reds,open_air,urban
+CLE,Progressive Field,Guardians,open_air,urban
+COL,Coors Field,Rockies,open_air,urban
+CWS,Guaranteed Rate Field,White Sox,open_air,urban
+DET,Comerica Park,Tigers,open_air,urban
+HOU,Minute Maid Park,Astros,retractable,urban
+KC,Kauffman Stadium,Royals,open_air,suburban
+LAA,Angel Stadium,Angels,open_air,suburban
+LAD,Dodger Stadium,Dodgers,open_air,urban
+MIA,loanDepot Park,Marlins,retractable,urban
+MIL,American Family Field,Brewers,retractable,suburban
+MIN,Target Field,Twins,open_air,urban
+NYM,Citi Field,Mets,open_air,urban
+NYY,Yankee Stadium,Yankees,open_air,urban
+PHI,Citizens Bank Park,Phillies,open_air,urban
+PIT,PNC Park,Pirates,open_air,urban
+SD,Petco Park,Padres,open_air,urban
+SEA,T-Mobile Park,Mariners,retractable,urban
+SF,Oracle Park,Giants,open_air,urban
+STL,Busch Stadium,Cardinals,open_air,urban
+TB,Tropicana Field,Rays,fixed_dome,suburban
+TEX,Globe Life Field,Rangers,retractable,suburban
+TOR,Rogers Centre,Blue Jays,retractable,urban
+WSH,Nationals Park,Nationals,open_air,urban

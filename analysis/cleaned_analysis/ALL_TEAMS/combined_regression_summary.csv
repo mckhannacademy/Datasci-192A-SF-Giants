@@ -1,0 +1,7 @@
+dependent_var,model,n_obs,n_dropped,r_squared,adj_r_squared,f_pvalue,output_file
+away_runs_scored,with_wind,23651,130,0.0114,0.0111,0.0,ols_with_wind_away_runs_scored.png
+away_runs_scored,without_wind,23651,130,0.0107,0.0105,0.0,ols_without_wind_away_runs_scored.png
+away_bat_k,with_wind,23466,315,0.0116,0.0112,0.0,ols_with_wind_away_bat_k.png
+away_bat_k,without_wind,23466,315,0.0107,0.0105,0.0,ols_without_wind_away_bat_k.png
+away_bat_hr_h_ratio,with_wind,23449,332,0.0044,0.004,0.0,ols_with_wind_away_bat_hr_h_ratio.png
+away_bat_hr_h_ratio,without_wind,23449,332,0.0027,0.0025,0.0,ols_without_wind_away_bat_hr_h_ratio.png
