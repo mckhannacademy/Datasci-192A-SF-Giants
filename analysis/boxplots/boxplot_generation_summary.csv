@@ -1,0 +1,31 @@
+team_code,team_name,stadium_name,games,output_file
+AZ,Diamondbacks,Chase Field,404,AZ_boxplot.png
+ATH,Athletics,Oakland Coliseum,324,ATH_boxplot.png
+ATL,Braves,Truist Park,404,ATL_boxplot.png
+BAL,Orioles,Camden Yards,405,BAL_boxplot.png
+BOS,Red Sox,Fenway Park,405,BOS_boxplot.png
+CHC,Cubs,Wrigley Field,405,CHC_boxplot.png
+CIN,Reds,Great American Ball Park,405,CIN_boxplot.png
+CLE,Guardians,Progressive Field,404,CLE_boxplot.png
+COL,Rockies,Coors Field,405,COL_boxplot.png
+CWS,White Sox,Guaranteed Rate Field,405,CWS_boxplot.png
+DET,Tigers,Comerica Park,405,DET_boxplot.png
+HOU,Astros,Minute Maid Park,404,HOU_boxplot.png
+KC,Royals,Kauffman Stadium,405,KC_boxplot.png
+LAA,Angels,Angel Stadium,405,LAA_boxplot.png
+LAD,Dodgers,Dodger Stadium,404,LAD_boxplot.png
+MIA,Marlins,loanDepot Park,404,MIA_boxplot.png
+MIL,Brewers,American Family Field,405,MIL_boxplot.png
+MIN,Twins,Target Field,405,MIN_boxplot.png
+NYM,Mets,Citi Field,405,NYM_boxplot.png
+NYY,Yankees,Yankee Stadium,405,NYY_boxplot.png
+PHI,Phillies,Citizens Bank Park,405,PHI_boxplot.png
+PIT,Pirates,PNC Park,405,PIT_boxplot.png
+SD,Padres,Petco Park,404,SD_boxplot.png
+SEA,Mariners,T-Mobile Park,404,SEA_boxplot.png
+SF,Giants,Oracle Park,405,SF_boxplot.png
+STL,Cardinals,Busch Stadium,405,STL_boxplot.png
+TB,Rays,Tropicana Field,404,TB_boxplot.png
+TEX,Rangers,Globe Life Field,404,TEX_boxplot.png
+TOR,Blue Jays,Rogers Centre,404,TOR_boxplot.png
+WSH,Nationals,Nationals Park,405,WSH_boxplot.png
