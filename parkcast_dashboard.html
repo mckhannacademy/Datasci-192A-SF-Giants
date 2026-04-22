@@ -559,13 +559,22 @@ function findAnalogs(rows, wx, n = 6) {
 
 // Compute real per-game park factor from data rows
 function computeRealParkFactors(rows) {
-  return rows
-    .filter(r => parseFloat(r.away_runs_scored) > 0)
-    .map(r => ({
-      date: r.game_date,
-      pf:   +((parseFloat(r.home_runs_scored) / parseFloat(r.away_runs_scored)) * 100).toFixed(1),
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  // Aggregate by year, return avg away runs per year as park factor vs overall baseline
+  const yearMap = {};
+  rows.forEach(r => {
+    const yr = r.season || (r.game_date || '').slice(0, 4);
+    if (!yr) return;
+    const away = parseFloat(r.away_runs_scored);
+    if (isNaN(away)) return;
+    if (!yearMap[yr]) yearMap[yr] = [];
+    yearMap[yr].push(away);
+  });
+  const allAway = rows.map(r => parseFloat(r.away_runs_scored)).filter(v => !isNaN(v));
+  const baseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
+  return Object.keys(yearMap).sort().map(yr => ({
+    yr,
+    pf: +((yearMap[yr].reduce((a,b)=>a+b,0) / yearMap[yr].length / baseline) * 100).toFixed(1),
+  }));
 }
 
 
@@ -1329,12 +1338,12 @@ function renderParkFactorChart(p) {
   let labels, histData, isReal = false;
 
   if (stadiumRows && stadiumRows.length > 0) {
-    // ── Real data path ─────────────────────────────────────────
-    const pfPoints = computeRealParkFactors(stadiumRows);
-    labels   = pfPoints.map(x => x.date);
-    histData = pfPoints.map(x => x.pf);
-    isReal   = true;
-  } else {
+      // ── Real data: yearly aggregation ──────────────────────────
+      const pfPoints = computeRealParkFactors(stadiumRows);
+      labels   = pfPoints.map(x => x.yr);
+      histData = pfPoints.map(x => x.pf);
+      isReal   = true;
+    } else {
     // ── Placeholder fallback ───────────────────────────────────
     const seed = activeStadium * 7;
     histData = Array.from({length: 60}, (_, i) => {
