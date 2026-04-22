@@ -1014,7 +1014,7 @@ function renderMain() {
     <div class="section-divider">
       <div class="section-divider-label">Seasonal Weather Distributions</div>
       <div class="section-divider-line"></div>
-      <div class="panel-tag">2020–2025 · game-time hourly · MOCK DATA</div>
+      <div class="panel-tag">Game-time hourly · ${stadiumRows ? 'Real data' : 'Load PAT to populate'}</div>
     </div>
     <div class="dist-row">
       <div class="dist-card">
@@ -1191,37 +1191,137 @@ function gaussianBins(mean, std, bins) {
 }
 
 function renderDistCharts() {
-  // Month bins: April through September (MLB regular season)
-  const MONTHS = ['Apr','May','Jun','Jul','Aug','Sep'];
+  const MONTHS      = ['Apr','May','Jun','Jul','Aug','Sep'];
+  const MONTH_NUMS  = [4, 5, 6, 7, 8, 9];
 
-  const cfg = (labels, data, color) => ({
-    type: 'bar',
-    data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 3, borderSkipped: false }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
-        y: { display: false }
-      }
-    }
+  // Destroy any existing charts on these canvases
+  ['dist-temp','dist-press','dist-hum','dist-wind'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el._chart) { el._chart.destroy(); el._chart = null; }
   });
 
-  // Oracle Park monthly median temps (°F) — mock seasonal arc
-  const tempData = [54, 57, 60, 63, 63, 62];
-  new Chart(document.getElementById('dist-temp'), cfg(MONTHS, tempData, '#40b4e5'));
+  function median(arr) {
+    if (!arr.length) return null;
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+  }
+  function quantile(arr, q) {
+    if (!arr.length) return null;
+    const s = [...arr].sort((a, b) => a - b);
+    return s[Math.floor(s.length * q)];
+  }
+  function stdDev(arr) {
+    if (!arr.length) return null;
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
+  }
 
-  // Pressure (hPa) — relatively stable, slight summer dip
-  const pressData = [1015, 1014, 1013, 1012, 1012, 1013];
-  new Chart(document.getElementById('dist-press'), cfg(MONTHS, pressData, '#9b6fff'));
+  function getMonthlyStats(field) {
+    return MONTH_NUMS.map(mo => {
+      const vals = (stadiumRows || [])
+        .filter(r => {
+          const d = r.game_date || '';
+          return parseInt(d.slice(5, 7)) === mo;
+        })
+        .map(r => parseFloat(r[field]))
+        .filter(v => !isNaN(v));
+      return {
+        median: median(vals),
+        q1:     quantile(vals, 0.25),
+        q3:     quantile(vals, 0.75),
+        std:    stdDev(vals),
+        n:      vals.length,
+      };
+    });
+  }
 
-  // Humidity (%) — fog season peaks in Jun/Jul
-  const humData = [72, 76, 84, 87, 83, 78];
-  new Chart(document.getElementById('dist-hum'), cfg(MONTHS, humData, '#34c77b'));
+  function overallStats(field) {
+    const vals = (stadiumRows || []).map(r => parseFloat(r[field])).filter(v => !isNaN(v));
+    const allQ1 = quantile(vals, 0.25);
+    const allQ3 = quantile(vals, 0.75);
+    return {
+      median: median(vals),
+      iqrLow: allQ1,
+      iqrHigh: allQ3,
+      std: stdDev(vals),
+    };
+  }
 
-  // Wind speed (mph) — bay winds stronger May–Aug
-  const windData = [11, 14, 17, 19, 18, 15];
-  new Chart(document.getElementById('dist-wind'), cfg(MONTHS, windData, '#f5803e'));
+  function drawCard(canvasId, statsArr, color, field, unit, decimals = 0) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const hasReal = stadiumRows && stadiumRows.length > 0;
+    const vals    = statsArr.map(s => s.median);
+    const allValid = vals.filter(v => v !== null);
+
+    // Update the summary stats below the chart
+    const card = canvas.closest('.dist-card');
+    if (card && hasReal) {
+      const ov = overallStats(field);
+      const statEls = card.querySelectorAll('.dist-stat-val');
+      if (statEls[0]) statEls[0].textContent = ov.median !== null ? `${ov.median.toFixed(decimals)}${unit}` : '—';
+      if (statEls[1]) statEls[1].textContent = (ov.iqrLow !== null && ov.iqrHigh !== null)
+        ? `${ov.iqrLow.toFixed(decimals)}–${ov.iqrHigh.toFixed(decimals)}${unit}` : '—';
+      if (statEls[2]) statEls[2].textContent = ov.std !== null ? `±${ov.std.toFixed(decimals)}${unit}` : '—';
+
+      // Update the "MOCK DATA" tag to show real data badge
+      const tag = document.querySelector('.dist-row')?.closest('div')?.previousElementSibling?.querySelector('.panel-tag');
+    }
+
+    const chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: MONTHS,
+        datasets: [{
+          data: allValid.length ? vals.map(v => v !== null ? +v.toFixed(decimals) : null) : [],
+          backgroundColor: color,
+          borderRadius: 3,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const s = statsArr[ctx.dataIndex];
+                if (!s || s.median === null) return 'No data';
+                return [
+                  `Median: ${s.median.toFixed(decimals)}${unit}`,
+                  s.q1 !== null ? `IQR: ${s.q1.toFixed(decimals)}–${s.q3.toFixed(decimals)}${unit}` : '',
+                  s.std !== null ? `Std: ±${s.std.toFixed(decimals)}${unit}` : '',
+                  `n = ${s.n} games`,
+                ].filter(Boolean);
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
+          y: { display: false }
+        }
+      }
+    });
+    canvas._chart = chart;
+  }
+
+  // Draw all four cards — real data if loaded, graceful empty bars if not
+  drawCard('dist-temp',  getMonthlyStats('temp_f'),   '#40b4e5', 'temp_f',   '°F',   0);
+  drawCard('dist-press', getMonthlyStats('pres'),      '#9b6fff', 'pres',     ' hPa', 0);
+  drawCard('dist-hum',   getMonthlyStats('rhum'),      '#34c77b', 'rhum',     '%',    0);
+  drawCard('dist-wind',  getMonthlyStats('wspd_mph'),  '#f5803e', 'wspd_mph', ' mph', 1);
+
+  // Update the section tag label to reflect data source
+  const sectionTag = document.querySelector('.section-divider .panel-tag');
+  if (sectionTag) {
+    sectionTag.textContent = stadiumRows && stadiumRows.length > 0
+      ? `2018–2025 · game-time hourly · Real data`
+      : `2020–2025 · game-time hourly · Load data to populate`;
+  }
 }
 
 function renderRegressionScatters() {
@@ -1328,19 +1428,34 @@ function renderParkFactorChart(p) {
   let labels, histData, isReal = false;
 
   if (stadiumRows && stadiumRows.length > 0) {
-    // ── Real data path ─────────────────────────────────────────
-    const pfPoints = computeRealParkFactors(stadiumRows);
-    labels   = pfPoints.map(x => x.date);
-    histData = pfPoints.map(x => x.pf);
-    isReal   = true;
-  } else {
-    // ── Placeholder fallback ───────────────────────────────────
-    const seed = activeStadium * 7;
-    histData = Array.from({length: 60}, (_, i) => {
-      const noise = Math.sin(seed + i * 0.7) * 5 + (Math.random() - 0.5) * 7;
-      return +(100 + noise).toFixed(1);
+    // ── Real data: aggregate by year ───────────────────────────
+    const yearMap = {};
+    stadiumRows.forEach(r => {
+      const yr = r.season || (r.game_date || '').slice(0, 4);
+      if (!yr) return;
+      const awayRuns = parseFloat(r.away_runs_scored);
+      const homeRuns = parseFloat(r.home_runs_scored);
+      if (isNaN(awayRuns) || isNaN(homeRuns)) return;
+      if (!yearMap[yr]) yearMap[yr] = { away: [], home: [] };
+      yearMap[yr].away.push(awayRuns);
+      yearMap[yr].home.push(homeRuns);
     });
-    labels = histData.map((_, i) => `G${i+1}`);
+
+    // Overall average away runs as baseline
+    const allAway = stadiumRows.map(r => parseFloat(r.away_runs_scored)).filter(v => !isNaN(v));
+    const baseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
+
+    labels   = Object.keys(yearMap).sort();
+    histData = labels.map(yr => {
+      const avg = yearMap[yr].away.reduce((a, b) => a + b, 0) / yearMap[yr].away.length;
+      return +((avg / baseline) * 100).toFixed(1);
+    });
+    isReal = true;
+  } else {
+    // ── Placeholder: one bar per year 2021–2025 ────────────────
+    labels   = ['2021','2022','2023','2024','2025'];
+    const seed = activeStadium * 7;
+    histData = labels.map((_, i) => +(100 + Math.sin(seed + i) * 4 + (Math.random()-0.5)*3).toFixed(1));
   }
 
   window._pfChart = new Chart(canvas, {
@@ -1349,18 +1464,20 @@ function renderParkFactorChart(p) {
       labels,
       datasets: [
         {
-          label: isReal ? 'Historical PF (actual)' : 'Historical PF (placeholder)',
+          label: isReal ? 'Avg Park Factor by Year' : 'Park Factor (placeholder)',
           data: histData,
-          backgroundColor: histData.map(v => v > 100 ? 'rgba(52,199,123,0.35)' : 'rgba(232,80,80,0.35)'),
-          borderRadius: 2,
+          backgroundColor: histData.map(v => v >= 100 ? 'rgba(52,199,123,0.6)' : 'rgba(232,80,80,0.6)'),
+          borderRadius: 4,
+          borderSkipped: false,
           order: 2,
         },
         {
-          label: "Today's model prediction",
-          data: histData.map(() => p.parkFactor),
+          label: "Today's projection",
+          data: labels.map(() => p.parkFactor),
           type: 'line',
           borderColor: '#f5c842',
           borderWidth: 2,
+          borderDash: [4, 3],
           pointRadius: 0,
           tension: 0,
           order: 1,
@@ -1373,13 +1490,17 @@ function renderParkFactorChart(p) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => isReal ? labels[items[0].dataIndex] : `Game ${items[0].dataIndex + 1}`,
-            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1)
+            label: ctx => ctx.datasetIndex === 0
+              ? `Avg PF: ${ctx.parsed.y.toFixed(1)}`
+              : `Today's projection: ${ctx.parsed.y.toFixed(1)}`
           }
         }
       },
       scales: {
-        x: { display: false },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#5e6e8a', font: { family: 'DM Mono', size: 11 } }
+        },
         y: {
           grid: { color: 'rgba(255,255,255,0.05)' },
           ticks: { color: '#5e6e8a', font: { size: 10 } },
