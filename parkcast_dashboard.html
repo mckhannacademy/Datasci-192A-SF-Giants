@@ -86,7 +86,7 @@
   .kpi-value.up { color: var(--green); }
   .kpi-value.down { color: var(--red); }
   .kpi-value.neutral { color: var(--text1); }
-  .kpi-desc { font-size: 11px; color: var(--text2); }
+  .kpi-desc { font-size: 14px; color: var(--text0); }
   .kpi-conf { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
   .kpi-conf-label { font-size: 10px; color: var(--text2); }
   .kpi-conf-bar { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; }
@@ -189,12 +189,10 @@
     </div>
   </div>
   <div class="body">
+    <!-- EDIT 2: Sidebar reordered — inputs/run button ABOVE stadium search/list -->
     <div class="sidebar">
-      <div>
-        <div class="sidebar-section-label">Stadium</div>
-        <input class="stadium-search" type="text" placeholder="Search stadiums..." oninput="filterStadiums(this.value)">
-        <div class="stadium-list" id="stadium-list"></div>
-      </div>
+ 
+      <!-- DATE & GAME TIME -->
       <div class="date-block">
         <div class="sidebar-section-label">Date &amp; Game Time</div>
         <label>Game Date</label>
@@ -207,6 +205,8 @@
           <option value="20">8:05 PM</option>
         </select>
       </div>
+ 
+      <!-- WEATHER INPUTS -->
       <div class="weather-inputs">
         <div class="sidebar-section-label">Weather at First Pitch</div>
         <div class="wx-row">
@@ -230,6 +230,8 @@
           <input type="range" min="2890" max="3050" value="2992" id="wx-press" oninput="updateWx()">
         </div>
       </div>
+ 
+      <!-- DAY/NIGHT TOGGLE -->
       <div class="dn-toggle-wrap">
         <div class="dn-toggle-label">Game Type</div>
         <div class="dn-toggle">
@@ -237,12 +239,27 @@
           <button class="dn-btn" id="dn-night" onclick="setDayNight('night')">&#9790; Night</button>
         </div>
       </div>
+ 
+      <!-- GITHUB PAT -->
       <div class="pat-wrap">
         <div class="sidebar-section-label">GitHub Access</div>
         <input class="pat-input" type="password" id="gh-pat" placeholder="Paste GitHub PAT…" oninput="onPatInput()">
         <div class="pat-status idle" id="pat-status">No token — using placeholder data</div>
       </div>
+ 
+      <!-- RUN BUTTON -->
       <button class="run-btn" onclick="runModel()">&#9654; Run Projection</button>
+ 
+      <!-- DIVIDER between controls and stadium list -->
+      <div class="sidebar-divider"></div>
+ 
+      <!-- STADIUM SEARCH & LIST -->
+      <div>
+        <div class="sidebar-section-label">Stadium</div>
+        <input class="stadium-search" type="text" placeholder="Search stadiums..." oninput="filterStadiums(this.value)">
+        <div class="stadium-list" id="stadium-list"></div>
+      </div>
+ 
     </div>
     <div class="main" id="main-content"></div>
   </div>
@@ -753,7 +770,8 @@ function computeProjection(wx, stadium) {
 
   // Baseline (neutral conditions, same park) for delta display
   const neutralWx = { temp: 72, hum: 62, wind: 7.6, winddir: stadium.orientation, press: 29.92, dayNight: 'day' };
-  const neutralAD = computeAirDensity(72, 62, 29.92 * 33.8639);
+  const neutralPresHpa = 1013.25;
+  const neutralAD = computeAirDensity(72, 62, 1013.25);
   const neutralWC = computeWindComponents(7.6, stadium.orientation, stadium.orientation);
   const neutralWOI = 7.6 * neutralWC.wind_cf;
   const neutralRaw = { temp_f:72, rhum:62, wspd_mph:7.6,
@@ -1498,20 +1516,13 @@ function renderParkFactorChart(p) {
         }
       },
       scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: '#5e6e8a', font: { family: 'DM Mono', size: 11 } }
-        },
-        y: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#5e6e8a', font: { size: 10 } },
-          title: { display: true, text: 'Park factor', color: '#5e6e8a', font: { size: 10 } }
-        }
+              x: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { family: 'DM Mono', size: 11 } }, title: { display: true, text: 'Game Year', color: '#FFFFFF', font: { size: 10 } } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
+            }
+          }
+        });
       }
-    }
-  });
-}
-
+      
 renderStadiumList();
 renderMain();
 </script>
