@@ -1,0 +1,1217 @@
+{
+  "_metadata": {
+    "generated_at": "2026-04-22T16:35:45.345165",
+    "source_file": "/Users/andrewchristofferson/Datasci-192A-SF-Giants/data/league_weather_2021_2025.csv",
+    "n_games": 12058,
+    "features": [
+      "temp_f",
+      "rhum",
+      "wspd_mph",
+      "wind_cf",
+      "air_density",
+      "is_night"
+    ],
+    "date_range": {
+      "min": "2021-04-01",
+      "max": "2025-09-28"
+    }
+  },
+  "league_wide": {
+    "temp_f": {
+      "mean": 71.6926,
+      "median": 72.4,
+      "std": 12.3582,
+      "min": 20.5,
+      "max": 112.3,
+      "q25": 63.9,
+      "q75": 79.9
+    },
+    "rhum": {
+      "mean": 63.1574,
+      "median": 65.3,
+      "std": 19.6761,
+      "min": 2.3,
+      "max": 100.0,
+      "q25": 50.7,
+      "q75": 78.3
+    },
+    "wspd_mph": {
+      "mean": 7.7307,
+      "median": 7.0,
+      "std": 3.8722,
+      "min": 0.5,
+      "max": 35.9,
+      "q25": 4.9,
+      "q75": 9.9
+    },
+    "wind_cf": {
+      "mean": 2.0629,
+      "median": 2.21,
+      "std": 10.0306,
+      "min": -38.01,
+      "max": 43.52,
+      "q25": -5.13,
+      "q75": 8.54
+    },
+    "air_density": {
+      "mean": 1.1688,
+      "median": 1.1711,
+      "std": 0.048,
+      "min": 0.9443,
+      "max": 1.2936,
+      "q25": 1.1501,
+      "q75": 1.1977
+    },
+    "is_night": {
+      "mean": 0.6186,
+      "median": 1.0,
+      "std": 0.4858,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 1.0
+    }
+  },
+  "park_specific": {
+    "ATH": {
+      "temp_f": {
+        "mean": 64.1074,
+        "median": 63.4,
+        "std": 8.0415,
+        "n_games": 324
+      },
+      "rhum": {
+        "mean": 70.017,
+        "median": 70.7,
+        "std": 16.1265,
+        "n_games": 324
+      },
+      "wspd_mph": {
+        "mean": 8.4586,
+        "median": 8.6,
+        "std": 3.0494,
+        "n_games": 324
+      },
+      "wind_cf": {
+        "mean": 10.6208,
+        "median": 10.875,
+        "std": 5.3821,
+        "n_games": 324
+      },
+      "air_density": {
+        "mean": 1.2077,
+        "median": 1.2079,
+        "std": 0.0207,
+        "n_games": 324
+      },
+      "is_night": {
+        "mean": 0.5031,
+        "median": 1.0,
+        "std": 0.5008,
+        "n_games": 324
+      }
+    },
+    "ATL": {
+      "temp_f": {
+        "mean": 73.9069,
+        "median": 74.45,
+        "std": 8.7665,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 68.1569,
+        "median": 67.3,
+        "std": 17.3777,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 5.8374,
+        "median": 5.4,
+        "std": 2.5213,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": -0.4437,
+        "median": -1.455,
+        "std": 7.4246,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1435,
+        "median": 1.1415,
+        "std": 0.0211,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.75,
+        "median": 1.0,
+        "std": 0.4335,
+        "n_games": 404
+      }
+    },
+    "AZ": {
+      "temp_f": {
+        "mean": 95.4102,
+        "median": 96.3,
+        "std": 9.8354,
+        "n_games": 401
+      },
+      "rhum": {
+        "mean": 18.7132,
+        "median": 13.7,
+        "std": 15.1717,
+        "n_games": 401
+      },
+      "wspd_mph": {
+        "mean": 7.3045,
+        "median": 7.1,
+        "std": 3.5405,
+        "n_games": 401
+      },
+      "wind_cf": {
+        "mean": 1.9062,
+        "median": 1.53,
+        "std": 6.26,
+        "n_games": 401
+      },
+      "air_density": {
+        "mean": 1.0915,
+        "median": 1.089,
+        "std": 0.021,
+        "n_games": 401
+      },
+      "is_night": {
+        "mean": 0.5594,
+        "median": 1.0,
+        "std": 0.4971,
+        "n_games": 404
+      }
+    },
+    "BAL": {
+      "temp_f": {
+        "mean": 72.2514,
+        "median": 73.8,
+        "std": 10.0022,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 66.4183,
+        "median": 67.0,
+        "std": 18.2333,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.4948,
+        "median": 6.0,
+        "std": 3.034,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 2.3171,
+        "median": 2.98,
+        "std": 7.5434,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.187,
+        "median": 1.1833,
+        "std": 0.0265,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6444,
+        "median": 1.0,
+        "std": 0.4793,
+        "n_games": 405
+      }
+    },
+    "BOS": {
+      "temp_f": {
+        "mean": 65.7319,
+        "median": 66.5,
+        "std": 11.5661,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 69.4272,
+        "median": 72.3,
+        "std": 18.4385,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.9338,
+        "median": 7.1,
+        "std": 3.6249,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 2.9432,
+        "median": 3.43,
+        "std": 10.595,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.2033,
+        "median": 1.1997,
+        "std": 0.0306,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6444,
+        "median": 1.0,
+        "std": 0.4793,
+        "n_games": 405
+      }
+    },
+    "CHC": {
+      "temp_f": {
+        "mean": 67.0909,
+        "median": 69.5,
+        "std": 12.966,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 69.0625,
+        "median": 70.3,
+        "std": 15.8158,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 10.3906,
+        "median": 9.6,
+        "std": 4.6396,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -1.4658,
+        "median": -5.04,
+        "std": 14.3098,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1765,
+        "median": 1.1701,
+        "std": 0.0338,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.4346,
+        "median": 0.0,
+        "std": 0.4963,
+        "n_games": 405
+      }
+    },
+    "CIN": {
+      "temp_f": {
+        "mean": 73.7385,
+        "median": 75.3,
+        "std": 10.2413,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 59.2175,
+        "median": 57.7,
+        "std": 16.4297,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.5005,
+        "median": 5.8,
+        "std": 3.064,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 2.0921,
+        "median": 2.15,
+        "std": 7.5563,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1646,
+        "median": 1.1591,
+        "std": 0.026,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.5926,
+        "median": 1.0,
+        "std": 0.492,
+        "n_games": 405
+      }
+    },
+    "CLE": {
+      "temp_f": {
+        "mean": 67.349,
+        "median": 69.6,
+        "std": 11.1378,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 71.9884,
+        "median": 72.3,
+        "std": 11.5006,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 8.076,
+        "median": 7.3,
+        "std": 4.0646,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": -1.9148,
+        "median": -3.045,
+        "std": 10.0009,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1737,
+        "median": 1.1661,
+        "std": 0.0298,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6609,
+        "median": 1.0,
+        "std": 0.474,
+        "n_games": 404
+      }
+    },
+    "COL": {
+      "temp_f": {
+        "mean": 71.0042,
+        "median": 72.8,
+        "std": 14.0996,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 37.8773,
+        "median": 31.3,
+        "std": 21.8402,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.199,
+        "median": 5.6,
+        "std": 3.3716,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -1.8282,
+        "median": -3.07,
+        "std": 8.4539,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 0.9944,
+        "median": 0.9897,
+        "std": 0.0256,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.642,
+        "median": 1.0,
+        "std": 0.48,
+        "n_games": 405
+      }
+    },
+    "CWS": {
+      "temp_f": {
+        "mean": 67.863,
+        "median": 69.6,
+        "std": 11.9612,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 68.9849,
+        "median": 70.7,
+        "std": 17.3878,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 9.8368,
+        "median": 9.1,
+        "std": 4.5493,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -1.0014,
+        "median": -2.71,
+        "std": 10.6721,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1743,
+        "median": 1.1704,
+        "std": 0.0298,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6099,
+        "median": 1.0,
+        "std": 0.4884,
+        "n_games": 405
+      }
+    },
+    "DET": {
+      "temp_f": {
+        "mean": 69.8768,
+        "median": 72.4,
+        "std": 11.5057,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 59.6222,
+        "median": 57.7,
+        "std": 15.3411,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 8.9891,
+        "median": 8.2,
+        "std": 4.2883,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -0.2247,
+        "median": -1.37,
+        "std": 10.3186,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1699,
+        "median": 1.1635,
+        "std": 0.0295,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.521,
+        "median": 1.0,
+        "std": 0.5002,
+        "n_games": 405
+      }
+    },
+    "HOU": {
+      "temp_f": {
+        "mean": 81.171,
+        "median": 81.2,
+        "std": 7.126,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 72.4327,
+        "median": 75.5,
+        "std": 16.1577,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 7.5762,
+        "median": 7.0,
+        "std": 3.658,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": 8.2153,
+        "median": 8.785,
+        "std": 8.821,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1607,
+        "median": 1.1596,
+        "std": 0.0169,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6906,
+        "median": 1.0,
+        "std": 0.4628,
+        "n_games": 404
+      }
+    },
+    "KC": {
+      "temp_f": {
+        "mean": 74.1598,
+        "median": 75.6,
+        "std": 11.4178,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 60.5244,
+        "median": 60.0,
+        "std": 16.7911,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.956,
+        "median": 6.3,
+        "std": 3.4026,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 0.1381,
+        "median": -1.12,
+        "std": 8.2728,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1479,
+        "median": 1.1421,
+        "std": 0.0291,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6321,
+        "median": 1.0,
+        "std": 0.4828,
+        "n_games": 405
+      }
+    },
+    "LAA": {
+      "temp_f": {
+        "mean": 70.3343,
+        "median": 69.4,
+        "std": 7.9154,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 63.1086,
+        "median": 67.7,
+        "std": 15.8265,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.4304,
+        "median": 6.0,
+        "std": 2.2673,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 9.5166,
+        "median": 9.12,
+        "std": 3.7198,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1849,
+        "median": 1.1851,
+        "std": 0.019,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.7605,
+        "median": 1.0,
+        "std": 0.4273,
+        "n_games": 405
+      }
+    },
+    "LAD": {
+      "temp_f": {
+        "mean": 68.3485,
+        "median": 68.05,
+        "std": 9.2561,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 63.7332,
+        "median": 68.3,
+        "std": 17.06,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 5.8946,
+        "median": 5.2,
+        "std": 2.6064,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": 7.8704,
+        "median": 7.365,
+        "std": 4.4682,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1734,
+        "median": 1.1728,
+        "std": 0.022,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.7426,
+        "median": 1.0,
+        "std": 0.4378,
+        "n_games": 404
+      }
+    },
+    "MIA": {
+      "temp_f": {
+        "mean": 81.4812,
+        "median": 81.6,
+        "std": 3.9743,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 72.9493,
+        "median": 73.3,
+        "std": 11.3388,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 7.6641,
+        "median": 7.4,
+        "std": 3.3758,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": -5.925,
+        "median": -7.36,
+        "std": 8.292,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1651,
+        "median": 1.1643,
+        "std": 0.0108,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6213,
+        "median": 1.0,
+        "std": 0.4857,
+        "n_games": 404
+      }
+    },
+    "MIL": {
+      "temp_f": {
+        "mean": 65.0689,
+        "median": 66.8,
+        "std": 13.1454,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 64.7835,
+        "median": 65.3,
+        "std": 17.6559,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 8.436,
+        "median": 7.9,
+        "std": 3.8049,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -0.6718,
+        "median": -1.32,
+        "std": 10.0819,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1807,
+        "median": 1.1762,
+        "std": 0.034,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6025,
+        "median": 1.0,
+        "std": 0.49,
+        "n_games": 405
+      }
+    },
+    "MIN": {
+      "temp_f": {
+        "mean": 68.9563,
+        "median": 70.9,
+        "std": 12.3268,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 58.7284,
+        "median": 58.7,
+        "std": 17.1144,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.3442,
+        "median": 6.6,
+        "std": 3.4101,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": -0.701,
+        "median": -1.85,
+        "std": 9.0166,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1616,
+        "median": 1.1567,
+        "std": 0.0312,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.5852,
+        "median": 1.0,
+        "std": 0.4933,
+        "n_games": 405
+      }
+    },
+    "NYM": {
+      "temp_f": {
+        "mean": 68.6002,
+        "median": 70.3,
+        "std": 10.5261,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 67.7054,
+        "median": 71.0,
+        "std": 18.7816,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.9477,
+        "median": 7.2,
+        "std": 3.7888,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 3.988,
+        "median": 4.75,
+        "std": 9.7058,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.198,
+        "median": 1.1928,
+        "std": 0.0279,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6247,
+        "median": 1.0,
+        "std": 0.4848,
+        "n_games": 405
+      }
+    },
+    "NYY": {
+      "temp_f": {
+        "mean": 69.4519,
+        "median": 70.2,
+        "std": 11.3612,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 65.8007,
+        "median": 67.0,
+        "std": 18.0736,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.7128,
+        "median": 7.1,
+        "std": 3.5223,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 1.9184,
+        "median": 3.0,
+        "std": 8.6062,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1953,
+        "median": 1.1916,
+        "std": 0.0294,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6247,
+        "median": 1.0,
+        "std": 0.4848,
+        "n_games": 405
+      }
+    },
+    "PHI": {
+      "temp_f": {
+        "mean": 72.8133,
+        "median": 74.2,
+        "std": 10.3967,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 61.4852,
+        "median": 61.0,
+        "std": 17.5949,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.216,
+        "median": 6.6,
+        "std": 3.3855,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 3.0154,
+        "median": 3.57,
+        "std": 8.8063,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1878,
+        "median": 1.1828,
+        "std": 0.0269,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6593,
+        "median": 1.0,
+        "std": 0.4745,
+        "n_games": 405
+      }
+    },
+    "PIT": {
+      "temp_f": {
+        "mean": 70.3432,
+        "median": 72.2,
+        "std": 10.3989,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 62.9575,
+        "median": 63.7,
+        "std": 17.2588,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.023,
+        "median": 5.5,
+        "std": 2.8296,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 2.6558,
+        "median": 2.75,
+        "std": 7.6195,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1633,
+        "median": 1.156,
+        "std": 0.0265,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6148,
+        "median": 1.0,
+        "std": 0.4872,
+        "n_games": 405
+      }
+    },
+    "SD": {
+      "temp_f": {
+        "mean": 67.2629,
+        "median": 67.45,
+        "std": 6.1412,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 72.6822,
+        "median": 75.7,
+        "std": 11.2936,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 7.3443,
+        "median": 6.9,
+        "std": 2.9195,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": 0.4166,
+        "median": 0.49,
+        "std": 6.4718,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1978,
+        "median": 1.1961,
+        "std": 0.0166,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.5272,
+        "median": 1.0,
+        "std": 0.4999,
+        "n_games": 404
+      }
+    },
+    "SEA": {
+      "temp_f": {
+        "mean": 63.0812,
+        "median": 63.1,
+        "std": 9.5946,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 63.6468,
+        "median": 62.5,
+        "std": 14.4372,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 7.3272,
+        "median": 7.3,
+        "std": 3.1849,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": -2.39,
+        "median": -4.84,
+        "std": 9.5059,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.213,
+        "median": 1.2126,
+        "std": 0.0242,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6683,
+        "median": 1.0,
+        "std": 0.4714,
+        "n_games": 404
+      }
+    },
+    "SF": {
+      "temp_f": {
+        "mean": 60.7264,
+        "median": 60.1,
+        "std": 5.2338,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 74.2659,
+        "median": 76.3,
+        "std": 12.9437,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 14.3116,
+        "median": 14.5,
+        "std": 4.1367,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 21.1877,
+        "median": 21.42,
+        "std": 6.9075,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.2148,
+        "median": 1.2161,
+        "std": 0.0139,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.5802,
+        "median": 1.0,
+        "std": 0.4941,
+        "n_games": 405
+      }
+    },
+    "STL": {
+      "temp_f": {
+        "mean": 75.3215,
+        "median": 76.3,
+        "std": 10.1219,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 62.0953,
+        "median": 61.3,
+        "std": 16.0963,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 7.0084,
+        "median": 5.8,
+        "std": 3.7383,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 2.0563,
+        "median": 1.93,
+        "std": 8.1142,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1609,
+        "median": 1.1579,
+        "std": 0.0251,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.6296,
+        "median": 1.0,
+        "std": 0.4835,
+        "n_games": 405
+      }
+    },
+    "TB": {
+      "temp_f": {
+        "mean": 81.9495,
+        "median": 82.0,
+        "std": 5.3496,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 66.0641,
+        "median": 67.3,
+        "std": 14.666,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 8.1676,
+        "median": 7.8,
+        "std": 3.6864,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": 0.8568,
+        "median": 1.035,
+        "std": 11.0233,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.163,
+        "median": 1.1613,
+        "std": 0.0133,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6089,
+        "median": 1.0,
+        "std": 0.4886,
+        "n_games": 404
+      }
+    },
+    "TEX": {
+      "temp_f": {
+        "mean": 83.0705,
+        "median": 83.85,
+        "std": 10.2067,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 56.2537,
+        "median": 54.85,
+        "std": 18.7331,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 8.4099,
+        "median": 7.9,
+        "std": 3.7346,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": -2.4664,
+        "median": -2.445,
+        "std": 6.7715,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1382,
+        "median": 1.135,
+        "std": 0.0231,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.6609,
+        "median": 1.0,
+        "std": 0.474,
+        "n_games": 404
+      }
+    },
+    "TOR": {
+      "temp_f": {
+        "mean": 65.855,
+        "median": 67.5,
+        "std": 10.812,
+        "n_games": 404
+      },
+      "rhum": {
+        "mean": 66.0832,
+        "median": 65.3,
+        "std": 16.1426,
+        "n_games": 404
+      },
+      "wspd_mph": {
+        "mean": 7.9324,
+        "median": 7.3,
+        "std": 3.6924,
+        "n_games": 404
+      },
+      "wind_cf": {
+        "mean": 0.2992,
+        "median": 0.59,
+        "std": 9.9304,
+        "n_games": 404
+      },
+      "air_density": {
+        "mean": 1.1924,
+        "median": 1.1878,
+        "std": 0.0276,
+        "n_games": 404
+      },
+      "is_night": {
+        "mean": 0.5842,
+        "median": 1.0,
+        "std": 0.4935,
+        "n_games": 404
+      }
+    },
+    "WSH": {
+      "temp_f": {
+        "mean": 73.2106,
+        "median": 75.1,
+        "std": 10.6317,
+        "n_games": 405
+      },
+      "rhum": {
+        "mean": 60.9751,
+        "median": 61.0,
+        "std": 19.2169,
+        "n_games": 405
+      },
+      "wspd_mph": {
+        "mean": 6.3316,
+        "median": 5.6,
+        "std": 3.2109,
+        "n_games": 405
+      },
+      "wind_cf": {
+        "mean": 0.5746,
+        "median": 0.7,
+        "std": 7.8047,
+        "n_games": 405
+      },
+      "air_density": {
+        "mean": 1.1854,
+        "median": 1.1808,
+        "std": 0.0272,
+        "n_games": 405
+      },
+      "is_night": {
+        "mean": 0.5556,
+        "median": 1.0,
+        "std": 0.4975,
+        "n_games": 405
+      }
+    }
+  }
+}
