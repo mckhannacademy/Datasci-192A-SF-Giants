@@ -65,7 +65,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Dict, List
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, RobustScaler, OneHotEncoder
 import warnings
 
 
@@ -268,8 +268,9 @@ TEAM_FILE_TO_ABBREV = {
     'yankee': 'NYY',
 }
 
-# Weather features to use (original + air_density for physics-based ball flight)
-WEATHER_FEATURES_BASIC = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'wind_lcf', 'wind_rcf', 'air_density']
+# Weather features to use (simplified - removed wind_lcf/wind_rcf due to r>0.94 with wind_cf)
+# Multicollinearity fix: only keep wind_cf as the representative wind direction feature
+WEATHER_FEATURES_BASIC = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density']
 
 # Enhanced weather features (physics-based)
 WEATHER_FEATURES_ENHANCED = [
@@ -704,7 +705,8 @@ def prepare_mixed_effects_data(
     standardize_weather: bool = True,
     test_start_season: int = 2023,
     use_enhanced_features: bool = False,
-    include_interactions: bool = False
+    include_interactions: bool = False,
+    scaler_type: str = 'robust'
 ) -> Dict[str, any]:
     """
     Prepare data specifically for mixed-effects regression models.
@@ -726,15 +728,19 @@ def prepare_mixed_effects_data(
         and stadium characteristics (elevation, has_roof)
     include_interactions : bool
         Whether to include dome × weather and elevation × air_density interactions
+    scaler_type : str
+        Type of scaler to use: 'robust' (default, uses median/IQR - less sensitive
+        to outliers) or 'standard' (uses mean/std)
 
     Returns
     -------
     Dict containing:
         - df_train: Training DataFrame ready for mixed-effects fitting
         - df_test: Test DataFrame for evaluation
-        - weather_scaler: Fitted StandardScaler (if standardize_weather=True)
+        - weather_scaler: Fitted scaler (if standardize_weather=True)
         - group_info: Dict with unique levels for each grouping variable
         - weather_features: List of weather feature names used
+        - scaler_type: Type of scaler used
     """
     # Determine which features to use
     if use_enhanced_features:
@@ -761,13 +767,15 @@ def prepare_mixed_effects_data(
                 pres
             )
 
-    # Add wind × speed interaction term (wind_out_impact)
-    # A 5 mph wind blowing out has minimal effect, but a 20 mph wind blowing out
-    # significantly helps home runs. This captures the non-linear interaction.
-    if 'wspd_mph' in data.columns and 'wind_cf' in data.columns:
-        data['wind_out_impact'] = data['wspd_mph'] * data['wind_cf']
-        if 'wind_out_impact' not in weather_features:
-            weather_features.append('wind_out_impact')
+    # NOTE: wind_out_impact (wspd_mph × wind_cf) was previously included but removed
+    # Reason: Not statistically significant (p > 0.65) and adds noise rather than signal
+    # The interaction was intended to capture non-linear effects of strong winds blowing out,
+    # but empirical testing showed it doesn't improve model performance.
+    # If you want to re-enable it for experimental purposes, uncomment below:
+    # if 'wspd_mph' in data.columns and 'wind_cf' in data.columns:
+    #     data['wind_out_impact'] = data['wspd_mph'] * data['wind_cf']
+    #     if 'wind_out_impact' not in weather_features:
+    #         weather_features.append('wind_out_impact')
 
     # Drop rows with missing values in key columns
     required_cols = weather_features + [TARGET_STRIKEOUTS, TARGET_RUNS, 'day_night',
@@ -816,7 +824,15 @@ def prepare_mixed_effects_data(
     features_to_scale = [f for f in weather_features if f not in ['has_roof']]
 
     if standardize_weather:
-        weather_scaler = StandardScaler()
+        # Use RobustScaler by default (less sensitive to outliers ~11.6% in wind features)
+        # RobustScaler uses median and IQR instead of mean and std
+        if scaler_type == 'robust':
+            weather_scaler = RobustScaler()
+        elif scaler_type == 'standard':
+            weather_scaler = StandardScaler()
+        else:
+            raise ValueError(f"Unknown scaler_type: {scaler_type}. Use 'robust' or 'standard'.")
+
         df_train[features_to_scale] = weather_scaler.fit_transform(df_train[features_to_scale])
         df_test[features_to_scale] = weather_scaler.transform(df_test[features_to_scale])
 
@@ -841,7 +857,7 @@ def prepare_mixed_effects_data(
     print(f"  Home teams (parks): {group_info['n_home_teams']}")
     print(f"  Away teams: {group_info['n_away_teams']}")
     print(f"  Seasons: {group_info['n_seasons']}")
-    print(f"  Weather standardized: {standardize_weather}")
+    print(f"  Weather standardized: {standardize_weather} (scaler: {scaler_type if standardize_weather else 'N/A'})")
     print(f"  Enhanced features: {use_enhanced_features}")
     print(f"  Weather features used: {weather_features}")
 
@@ -849,6 +865,7 @@ def prepare_mixed_effects_data(
         'df_train': df_train,
         'df_test': df_test,
         'weather_scaler': weather_scaler,
+        'scaler_type': scaler_type if standardize_weather else None,
         'group_info': group_info,
         'weather_features': weather_features,
         'features_scaled': features_to_scale,
@@ -864,7 +881,7 @@ def prepare_mixed_effects_data(
 
 def compute_team_season_averages(
     df: pd.DataFrame,
-    method: str = 'loo',
+    method: str = 'expanding',
     min_games: int = 10
 ) -> pd.DataFrame:
     """
@@ -878,11 +895,14 @@ def compute_team_season_averages(
     df : pd.DataFrame
         Dataset with away_team, season, away_bat_k, away_runs_scored columns
     method : str
+        'expanding' (RECOMMENDED) - use only games before current date
+            This prevents temporal leakage by only using past information.
         'loo' (leave-one-out) - compute average excluding current game
-        'expanding' - use only games before current date (more realistic)
+            WARNING: This causes temporal leakage as it uses future games
+            in computing the average. Only use for ablation studies.
     min_games : int
         Minimum games required before computing meaningful average.
-        Games before this threshold use the team's full-season average.
+        Games before this threshold use the team's partial-season average.
 
     Returns
     -------
@@ -891,6 +911,13 @@ def compute_team_season_averages(
         - away_team_avg_k: Team's average strikeouts as away team
         - away_team_avg_runs: Team's average runs as away team
         - away_team_games: Number of games used for average
+
+    Notes
+    -----
+    The 'expanding' method is recommended because it:
+    1. Prevents temporal leakage (no future information used)
+    2. More realistically models what would be known at prediction time
+    3. Provides more conservative but honest performance estimates
     """
     data = df.copy()
 
@@ -1110,7 +1137,7 @@ def prepare_deviation_data(
     test_start_season: int = 2023,
     use_enhanced_features: bool = False,
     include_interactions: bool = False,
-    deviation_method: str = 'loo',
+    deviation_method: str = 'expanding',
     min_games: int = 10
 ) -> Dict[str, any]:
     """

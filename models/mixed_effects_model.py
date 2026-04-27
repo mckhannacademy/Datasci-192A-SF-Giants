@@ -103,11 +103,120 @@ from statsmodels.regression.mixed_linear_model import MixedLMResults
 import warnings
 
 
+def compute_vif(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
+    """
+    Compute Variance Inflation Factor (VIF) for each feature.
+
+    VIF measures how much the variance of a regression coefficient is
+    inflated due to multicollinearity with other features.
+
+    VIF Guidelines:
+    - VIF = 1: No correlation with other features
+    - VIF < 5: Generally acceptable
+    - VIF >= 5: Moderate multicollinearity (investigate)
+    - VIF >= 10: Severe multicollinearity (remove or combine features)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset containing the features
+    features : List[str]
+        List of feature column names to check
+
+    Returns
+    -------
+    pd.DataFrame
+        VIF values for each feature, sorted by VIF descending
+    """
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+    # Filter to only features that exist in df
+    available_features = [f for f in features if f in df.columns]
+
+    if len(available_features) < 2:
+        return pd.DataFrame({'feature': available_features, 'VIF': [1.0] * len(available_features)})
+
+    # Extract feature matrix
+    X = df[available_features].dropna()
+
+    if len(X) == 0:
+        warnings.warn("No valid rows for VIF computation")
+        return pd.DataFrame({'feature': available_features, 'VIF': [np.nan] * len(available_features)})
+
+    # Add constant for VIF calculation
+    X_with_const = np.column_stack([np.ones(len(X)), X.values])
+
+    vif_data = []
+    for i, feature in enumerate(available_features):
+        try:
+            vif = variance_inflation_factor(X_with_const, i + 1)  # +1 because of constant
+            vif_data.append({'feature': feature, 'VIF': vif})
+        except Exception as e:
+            warnings.warn(f"Could not compute VIF for {feature}: {e}")
+            vif_data.append({'feature': feature, 'VIF': np.nan})
+
+    vif_df = pd.DataFrame(vif_data).sort_values('VIF', ascending=False)
+    vif_df['status'] = vif_df['VIF'].apply(
+        lambda x: 'SEVERE' if x >= 10 else ('MODERATE' if x >= 5 else 'OK')
+    )
+
+    return vif_df
+
+
+def check_multicollinearity(
+    df: pd.DataFrame,
+    features: List[str],
+    threshold: float = 5.0,
+    verbose: bool = True
+) -> Tuple[bool, pd.DataFrame]:
+    """
+    Check for multicollinearity issues and warn if found.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset containing features
+    features : List[str]
+        Features to check
+    threshold : float
+        VIF threshold above which to warn (default: 5.0)
+    verbose : bool
+        Whether to print warnings
+
+    Returns
+    -------
+    Tuple[bool, pd.DataFrame]
+        (has_issues, vif_dataframe)
+        has_issues is True if any VIF exceeds threshold
+    """
+    vif_df = compute_vif(df, features)
+
+    has_issues = (vif_df['VIF'] > threshold).any()
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print("MULTICOLLINEARITY CHECK (VIF)")
+        print(f"{'='*60}")
+        print(f"Threshold: VIF > {threshold}")
+        print(f"\n{vif_df.to_string(index=False)}")
+
+        if has_issues:
+            problematic = vif_df[vif_df['VIF'] > threshold]['feature'].tolist()
+            print(f"\n⚠️  WARNING: High VIF detected for: {problematic}")
+            print("Consider removing or combining these features.")
+        else:
+            print(f"\n✓ All features have VIF < {threshold}")
+
+        print(f"{'='*60}\n")
+
+    return has_issues, vif_df
+
+
 # Default feature sets
-# Basic features now include air_density (physics-based ball flight) and wind_out_impact
-# (interaction capturing that strong winds blowing out matter more than weak winds)
-BASIC_WEATHER_FEATURES = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density', 'wind_out_impact']
-ENHANCED_WEATHER_FEATURES = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density', 'heat_index', 'wind_out_impact']
+# Simplified: removed wind_lcf/wind_rcf (r>0.94 with wind_cf) and wind_out_impact (p>0.65)
+# Keep only features that are both statistically significant and not multicollinear
+BASIC_WEATHER_FEATURES = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density']
+ENHANCED_WEATHER_FEATURES = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density', 'heat_index']
 
 # Default random slope features
 # These are the weather features that may vary in effect by park
@@ -266,7 +375,9 @@ class MixedEffectsModelFitter:
         df_train: pd.DataFrame,
         random_slope_features: List[str] = None,
         method: str = 'lbfgs',
-        maxiter: int = 200
+        maxiter: int = 200,
+        check_vif: bool = True,
+        vif_threshold: float = 5.0
     ) -> Dict[str, MixedLMResults]:
         """
         Fit a hierarchy of increasingly complex mixed-effects models.
@@ -287,6 +398,10 @@ class MixedEffectsModelFitter:
             Optimization method for fitting
         maxiter : int
             Maximum iterations for optimization
+        check_vif : bool
+            Whether to check for multicollinearity before fitting (default: True)
+        vif_threshold : float
+            VIF threshold for warnings (default: 5.0)
 
         Returns
         -------
@@ -312,6 +427,22 @@ class MixedEffectsModelFitter:
         print(f"\n{'='*60}")
         print(f"Fitting Mixed-Effects Models for {self.target}")
         print(f"{'='*60}")
+
+        # Check for multicollinearity before fitting
+        if check_vif:
+            has_vif_issues, vif_df = check_multicollinearity(
+                self._df_train,
+                self.weather_features + ['is_night'],
+                threshold=vif_threshold,
+                verbose=True
+            )
+            self._vif_results = vif_df
+
+            if has_vif_issues:
+                warnings.warn(
+                    "High multicollinearity detected. Consider removing correlated features. "
+                    "Model coefficients may be unstable."
+                )
 
         # Model 1: Null model with team and season variance components
         print("\n[1/4] Fitting null model (team + season random effects)...")
@@ -445,7 +576,11 @@ class MixedEffectsModelFitter:
         """Return model comparison table sorted by AIC."""
         return self.comparison_df
 
-    def get_fixed_effects(self, model_name: str = 'park_slopes') -> pd.DataFrame:
+    def get_fixed_effects(
+        self,
+        model_name: str = 'park_intercept',
+        apply_bonferroni: bool = True
+    ) -> pd.DataFrame:
         """
         Extract fixed effects (average weather effects across all parks).
 
@@ -453,11 +588,16 @@ class MixedEffectsModelFitter:
         ----------
         model_name : str
             Which model to extract from
+        apply_bonferroni : bool
+            Whether to apply Bonferroni correction to p-values for multiple
+            comparisons. With 6 weather tests, α = 0.05 / 6 = 0.008.
+            Default True.
 
         Returns
         -------
         pd.DataFrame
-            Fixed effects with coefficients, SE, z-values, p-values
+            Fixed effects with coefficients, SE, z-values, p-values, and
+            optionally Bonferroni-corrected significance
         """
         if model_name not in self.models or self.models[model_name] is None:
             raise ValueError(f"Model '{model_name}' not fitted or failed")
@@ -470,9 +610,25 @@ class MixedEffectsModelFitter:
             'z_value': result.tvalues.values[:len(result.fe_params)],
             'p_value': result.pvalues.values[:len(result.fe_params)]
         })
+
+        if apply_bonferroni:
+            # Exclude intercept from multiple comparison count
+            n_tests = len(fe_df) - 1  # -1 for intercept
+            if n_tests > 1:
+                alpha_corrected = 0.05 / n_tests
+                fe_df['bonferroni_alpha'] = alpha_corrected
+                fe_df['significant_corrected'] = fe_df['p_value'] < alpha_corrected
+
+                # Mark significance without assuming intercept position
+                fe_df.loc[fe_df['Parameter'] == 'Intercept', 'significant_corrected'] = np.nan
+                fe_df.loc[fe_df['Parameter'] == 'Intercept', 'bonferroni_alpha'] = np.nan
+            else:
+                fe_df['significant_corrected'] = fe_df['p_value'] < 0.05
+                fe_df['bonferroni_alpha'] = 0.05
+
         return fe_df
 
-    def get_variance_components(self, model_name: str = 'park_slopes') -> pd.DataFrame:
+    def get_variance_components(self, model_name: str = 'park_intercept') -> pd.DataFrame:
         """
         Extract variance components (how much variance from each source).
 
@@ -552,14 +708,14 @@ class MixedEffectsModelFitter:
 
         return vc_df
 
-    def get_random_effects(self, model_name: str = 'park_slopes') -> pd.DataFrame:
+    def get_random_effects(self, model_name: str = 'park_intercept') -> pd.DataFrame:
         """
         Extract random effects (BLUPs) for each park.
 
         Parameters
         ----------
         model_name : str
-            Which model to extract from
+            Which model to extract from (default: 'park_intercept' for stability)
 
         Returns
         -------
@@ -576,37 +732,55 @@ class MixedEffectsModelFitter:
         for group, effects in re_dict.items():
             row = {'Park': group}
             if isinstance(effects, pd.Series):
-                # Check if this is a simple model (has 'home_team' or 'Group' key)
-                # or complex model with variance components
-                has_group_intercept = any(
-                    'home_team' in str(idx) or 'Group' in str(idx)
-                    for idx in effects.index if not str(idx).startswith('away_team') and not str(idx).startswith('season')
-                )
+                # For park_intercept and park_slopes models, look for:
+                # 1. 'Group' key (statsmodels default for random intercept)
+                # 2. 'Intercept' key (explicit intercept term)
+                # 3. First non-variance-component entry
 
-                if has_group_intercept:
-                    # Simple model - extract the group intercept
-                    for col, val in effects.items():
-                        clean_col = str(col).replace('[', '_').replace(']', '_')
-                        if 'home_team' in clean_col or 'Group' in clean_col:
-                            row['Intercept'] = val
-                        else:
-                            row[clean_col] = val
-                else:
-                    # Complex model with variance components
-                    # Sum the away_team effects to get a park-level "baseline" adjustment
-                    # Or just store individual effects
-                    away_team_effects = [val for idx, val in effects.items() if 'away_team' in str(idx)]
-                    season_effects = [val for idx, val in effects.items() if 'season' in str(idx)]
+                intercept_found = False
+                slope_effects = {}
 
-                    # Store aggregate measures
-                    if away_team_effects:
-                        row['Avg_AwayTeam_Effect'] = np.nanmean(away_team_effects)
-                    if season_effects:
-                        row['Avg_Season_Effect'] = np.nanmean(season_effects)
+                for idx, val in effects.items():
+                    idx_str = str(idx)
 
-                    # No group intercept in this formulation
+                    # Skip variance components (away_team, season)
+                    if 'away_team' in idx_str or 'season' in idx_str:
+                        continue
+
+                    # Check for intercept-like keys
+                    if idx_str == 'Group' or idx_str == 'Intercept' or 'home_team' in idx_str:
+                        row['Intercept'] = val
+                        intercept_found = True
+                    else:
+                        # This is a random slope effect
+                        clean_col = idx_str.replace('[', '_').replace(']', '_')
+                        slope_effects[clean_col] = val
+
+                # If no explicit intercept found but we have slope effects,
+                # the first entry in cov_re diagonal is the intercept variance
+                if not intercept_found:
+                    # For models with random slopes, the intercept is usually the first entry
+                    non_vc_entries = [(idx, val) for idx, val in effects.items()
+                                      if 'away_team' not in str(idx) and 'season' not in str(idx)]
+                    if non_vc_entries:
+                        # First non-VC entry is typically the intercept
+                        row['Intercept'] = non_vc_entries[0][1]
+                        intercept_found = True
+                        # Rest are slopes
+                        for idx, val in non_vc_entries[1:]:
+                            clean_col = str(idx).replace('[', '_').replace(']', '_')
+                            slope_effects[clean_col] = val
+
+                # Add slope effects
+                row.update(slope_effects)
+
+                # Fallback: if still no intercept, use 0.0 with warning
+                if not intercept_found:
                     row['Intercept'] = 0.0
+                    warnings.warn(f"Could not find intercept for park {group}, using 0.0")
+
             else:
+                # Simple scalar random effect
                 row['Intercept'] = effects
             rows.append(row)
 
@@ -618,7 +792,7 @@ class MixedEffectsModelFitter:
 
         return df
 
-    def compute_r_squared(self, model_name: str = 'park_slopes') -> Dict[str, float]:
+    def compute_r_squared(self, model_name: str = 'park_intercept') -> Dict[str, float]:
         """
         Compute marginal and conditional R² for mixed models.
 
@@ -676,7 +850,7 @@ class MixedEffectsModelFitter:
     def predict(
         self,
         df: pd.DataFrame,
-        model_name: str = 'park_slopes',
+        model_name: str = 'park_intercept',
         include_random: bool = True
     ) -> np.ndarray:
         """
@@ -687,7 +861,7 @@ class MixedEffectsModelFitter:
         df : pd.DataFrame
             Data to predict on
         model_name : str
-            Which model to use
+            Which model to use (default: 'park_intercept' for stability)
         include_random : bool
             Whether to include random effects in predictions
 
@@ -710,13 +884,29 @@ class MixedEffectsModelFitter:
         if include_random:
             return result.predict(df_pred)
         else:
-            # Fixed effects only
-            return result.predict(df_pred, exog=result.model.exog)
+            # Fixed effects only - manually compute using coefficients
+            # Get fixed effect parameters
+            fe_params = result.fe_params
+
+            # Build prediction using fixed effects only
+            # Start with intercept
+            y_pred = np.full(len(df_pred), fe_params.get('Intercept', 0.0))
+
+            # Add contributions from weather features
+            for feature in self.weather_features:
+                if feature in df_pred.columns and feature in fe_params.index:
+                    y_pred += df_pred[feature].values * fe_params[feature]
+
+            # Add is_night contribution if present
+            if 'is_night' in df_pred.columns and 'is_night' in fe_params.index:
+                y_pred += df_pred['is_night'].values * fe_params['is_night']
+
+            return y_pred
 
     def evaluate(
         self,
         df_test: pd.DataFrame,
-        model_name: str = 'park_slopes'
+        model_name: str = 'park_intercept'
     ) -> Dict[str, float]:
         """
         Evaluate model on test data.
@@ -751,7 +941,7 @@ class MixedEffectsModelFitter:
     def predict_raw(
         self,
         df: pd.DataFrame,
-        model_name: str = 'park_slopes',
+        model_name: str = 'park_intercept',
         include_random: bool = True
     ) -> np.ndarray:
         """
@@ -793,7 +983,7 @@ class MixedEffectsModelFitter:
     def evaluate_on_raw_scale(
         self,
         df_test: pd.DataFrame,
-        model_name: str = 'park_slopes'
+        model_name: str = 'park_intercept'
     ) -> Dict[str, float]:
         """
         Evaluate model on test data, using raw scale for fair comparison.
@@ -844,7 +1034,7 @@ class MixedEffectsModelFitter:
             'scale': 'raw'
         }
 
-    def summary(self, model_name: str = 'park_slopes') -> str:
+    def summary(self, model_name: str = 'park_intercept') -> str:
         """Get model summary."""
         if model_name not in self.models or self.models[model_name] is None:
             return f"Model '{model_name}' not fitted or failed"
@@ -994,6 +1184,179 @@ def fit_deviation_models(
     )
 
     return k_fitter, runs_fitter
+
+
+def time_series_cross_validate(
+    df: pd.DataFrame,
+    target: str,
+    weather_features: List[str],
+    n_splits: int = 5,
+    min_train_seasons: int = 2,
+    model_type: str = 'park_intercept',
+    verbose: bool = True
+) -> Dict[str, Any]:
+    """
+    Perform time-series cross-validation for mixed-effects models.
+
+    Uses expanding window approach where each fold uses all prior data
+    for training and one future season for testing. This prevents
+    temporal leakage and provides honest performance estimates.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Full dataset with season column
+    target : str
+        Target variable name
+    weather_features : List[str]
+        Weather features to use
+    n_splits : int
+        Number of CV folds (default: 5)
+    min_train_seasons : int
+        Minimum seasons required for training (default: 2)
+    model_type : str
+        Which model to evaluate ('park_intercept' or 'park_slopes')
+    verbose : bool
+        Whether to print progress
+
+    Returns
+    -------
+    Dict containing:
+        - fold_metrics: List of metrics for each fold
+        - mean_rmse: Average RMSE across folds
+        - std_rmse: Standard deviation of RMSE
+        - mean_r2: Average R² across folds
+        - fold_details: Detailed info about each fold
+    """
+    # Sort by date to ensure temporal ordering
+    df = df.sort_values('game_date').copy()
+
+    # Get unique seasons sorted
+    seasons = sorted(df['season'].astype(int).unique())
+
+    if len(seasons) < min_train_seasons + 1:
+        raise ValueError(f"Need at least {min_train_seasons + 1} seasons, got {len(seasons)}")
+
+    # Determine test seasons (use last n_splits seasons)
+    n_available = len(seasons) - min_train_seasons
+    actual_splits = min(n_splits, n_available)
+
+    if actual_splits < n_splits:
+        warnings.warn(f"Only {actual_splits} splits possible with {len(seasons)} seasons")
+
+    test_seasons = seasons[-actual_splits:]
+
+    fold_metrics = []
+    fold_details = []
+
+    for i, test_season in enumerate(test_seasons):
+        train_seasons = [s for s in seasons if s < test_season]
+
+        if len(train_seasons) < min_train_seasons:
+            continue
+
+        if verbose:
+            print(f"\n{'='*50}")
+            print(f"CV Fold {i+1}/{actual_splits}")
+            print(f"Train: {train_seasons}")
+            print(f"Test: {test_season}")
+            print(f"{'='*50}")
+
+        # Split data
+        train_mask = df['season'].astype(int).isin(train_seasons)
+        test_mask = df['season'].astype(int) == test_season
+
+        df_train = df[train_mask].copy()
+        df_test = df[test_mask].copy()
+
+        if verbose:
+            print(f"Train samples: {len(df_train)}, Test samples: {len(df_test)}")
+
+        # Fit model
+        try:
+            fitter = MixedEffectsModelFitter(
+                target=target,
+                weather_features=weather_features
+            )
+
+            # Suppress verbose output during CV
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+
+                # Only fit the model type we're evaluating
+                if model_type == 'park_intercept':
+                    fitter.models[model_type] = fitter._fit_park_intercept_model(
+                        ' + '.join(weather_features) + ' + is_night',
+                        'lbfgs', 200
+                    )
+                else:
+                    fitter.models['park_intercept'] = fitter._fit_park_intercept_model(
+                        ' + '.join(weather_features) + ' + is_night',
+                        'lbfgs', 200
+                    )
+
+                fitter._df_train = df_train
+
+            # Evaluate on test
+            metrics = fitter.evaluate(df_test, 'park_intercept')
+
+            fold_metrics.append({
+                'fold': i + 1,
+                'train_seasons': train_seasons,
+                'test_season': test_season,
+                'n_train': len(df_train),
+                'n_test': len(df_test),
+                'RMSE': metrics['RMSE'],
+                'MAE': metrics['MAE'],
+                'R2': metrics['R2'],
+                'converged': fitter.models['park_intercept'].converged
+            })
+
+            if verbose:
+                print(f"RMSE: {metrics['RMSE']:.4f}, R²: {metrics['R2']:.4f}")
+
+        except Exception as e:
+            if verbose:
+                print(f"Fold {i+1} failed: {e}")
+            fold_metrics.append({
+                'fold': i + 1,
+                'train_seasons': train_seasons,
+                'test_season': test_season,
+                'error': str(e)
+            })
+
+    # Compute summary statistics
+    successful_folds = [f for f in fold_metrics if 'RMSE' in f]
+
+    if len(successful_folds) == 0:
+        return {
+            'fold_metrics': fold_metrics,
+            'error': 'All folds failed'
+        }
+
+    rmse_values = [f['RMSE'] for f in successful_folds]
+    r2_values = [f['R2'] for f in successful_folds]
+
+    results = {
+        'fold_metrics': fold_metrics,
+        'mean_rmse': np.mean(rmse_values),
+        'std_rmse': np.std(rmse_values),
+        'mean_r2': np.mean(r2_values),
+        'std_r2': np.std(r2_values),
+        'n_successful_folds': len(successful_folds),
+        'n_total_folds': len(fold_metrics)
+    }
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print("CROSS-VALIDATION SUMMARY")
+        print(f"{'='*60}")
+        print(f"Successful folds: {results['n_successful_folds']}/{results['n_total_folds']}")
+        print(f"Mean RMSE: {results['mean_rmse']:.4f} ± {results['std_rmse']:.4f}")
+        print(f"Mean R²: {results['mean_r2']:.4f} ± {results['std_r2']:.4f}")
+        print(f"{'='*60}\n")
+
+    return results
 
 
 def compare_basic_vs_enhanced(

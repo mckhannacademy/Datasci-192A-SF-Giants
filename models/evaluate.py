@@ -193,6 +193,237 @@ def plot_residuals(
     return ax
 
 
+def plot_residual_diagnostics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    title_prefix: str = "Model",
+    figsize: Tuple[int, int] = (14, 10)
+) -> Tuple[plt.Figure, Dict[str, float]]:
+    """
+    Create comprehensive residual diagnostic plots.
+
+    Generates a 2x2 grid of diagnostic plots:
+    1. Residuals vs Fitted (check for heteroscedasticity)
+    2. Q-Q Plot (check for normality)
+    3. Scale-Location Plot (check for homoscedasticity)
+    4. Histogram of Residuals (distribution shape)
+
+    Also computes statistical tests for model assumptions.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        True values
+    y_pred : np.ndarray
+        Predicted values
+    title_prefix : str
+        Prefix for plot titles
+    figsize : Tuple[int, int]
+        Figure size
+
+    Returns
+    -------
+    Tuple[plt.Figure, Dict[str, float]]
+        Figure and dictionary of diagnostic statistics
+    """
+    from scipy import stats
+
+    residuals = y_true - y_pred
+    standardized_residuals = (residuals - np.mean(residuals)) / np.std(residuals)
+
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    fig.suptitle(f'{title_prefix} - Residual Diagnostics', fontsize=14, fontweight='bold')
+
+    # 1. Residuals vs Fitted
+    ax1 = axes[0, 0]
+    ax1.scatter(y_pred, residuals, alpha=0.5, s=10)
+    ax1.axhline(y=0, color='r', linestyle='--', linewidth=2)
+
+    # Add lowess smoothing line to detect patterns
+    try:
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+        sorted_idx = np.argsort(y_pred)
+        smoothed = lowess(residuals[sorted_idx], y_pred[sorted_idx], frac=0.3)
+        ax1.plot(smoothed[:, 0], smoothed[:, 1], 'g-', linewidth=2, label='LOWESS')
+        ax1.legend()
+    except ImportError:
+        pass
+
+    ax1.set_xlabel('Fitted Values')
+    ax1.set_ylabel('Residuals')
+    ax1.set_title('Residuals vs Fitted\n(Check for heteroscedasticity)')
+
+    # 2. Q-Q Plot
+    ax2 = axes[0, 1]
+    stats.probplot(standardized_residuals, dist="norm", plot=ax2)
+    ax2.set_title('Normal Q-Q Plot\n(Check for normality)')
+    ax2.get_lines()[0].set_markersize(3)
+    ax2.get_lines()[0].set_alpha(0.5)
+
+    # 3. Scale-Location Plot
+    ax3 = axes[1, 0]
+    sqrt_abs_residuals = np.sqrt(np.abs(standardized_residuals))
+    ax3.scatter(y_pred, sqrt_abs_residuals, alpha=0.5, s=10)
+
+    try:
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+        sorted_idx = np.argsort(y_pred)
+        smoothed = lowess(sqrt_abs_residuals[sorted_idx], y_pred[sorted_idx], frac=0.3)
+        ax3.plot(smoothed[:, 0], smoothed[:, 1], 'r-', linewidth=2)
+    except ImportError:
+        pass
+
+    ax3.set_xlabel('Fitted Values')
+    ax3.set_ylabel('√|Standardized Residuals|')
+    ax3.set_title('Scale-Location\n(Check for homoscedasticity)')
+
+    # 4. Histogram of Residuals
+    ax4 = axes[1, 1]
+    ax4.hist(standardized_residuals, bins=30, density=True, alpha=0.7, color='steelblue')
+
+    # Overlay normal distribution
+    x = np.linspace(-4, 4, 100)
+    ax4.plot(x, stats.norm.pdf(x), 'r-', linewidth=2, label='Normal')
+    ax4.set_xlabel('Standardized Residuals')
+    ax4.set_ylabel('Density')
+    ax4.set_title('Distribution of Residuals')
+    ax4.legend()
+
+    plt.tight_layout()
+
+    # Compute diagnostic statistics
+    diagnostics = {}
+
+    # Shapiro-Wilk test (on sample if n > 5000)
+    n = len(residuals)
+    if n > 5000:
+        sample_idx = np.random.choice(n, 5000, replace=False)
+        shapiro_stat, shapiro_p = stats.shapiro(residuals[sample_idx])
+        diagnostics['shapiro_note'] = 'Computed on 5000 sample'
+    else:
+        shapiro_stat, shapiro_p = stats.shapiro(residuals)
+
+    diagnostics['shapiro_statistic'] = shapiro_stat
+    diagnostics['shapiro_p_value'] = shapiro_p
+    diagnostics['normality_assumption'] = 'OK' if shapiro_p > 0.05 else 'VIOLATED'
+
+    # Durbin-Watson statistic (autocorrelation)
+    try:
+        from statsmodels.stats.stattools import durbin_watson
+        dw_stat = durbin_watson(residuals)
+        diagnostics['durbin_watson'] = dw_stat
+        # DW around 2 suggests no autocorrelation
+        diagnostics['autocorrelation'] = 'OK' if 1.5 < dw_stat < 2.5 else 'POSSIBLE'
+    except ImportError:
+        diagnostics['durbin_watson'] = None
+
+    # Breusch-Pagan test for heteroscedasticity
+    try:
+        from scipy.stats import spearmanr
+        _, bp_p = spearmanr(y_pred, np.abs(residuals))
+        diagnostics['heteroscedasticity_p'] = bp_p
+        diagnostics['homoscedasticity'] = 'OK' if bp_p > 0.05 else 'VIOLATED'
+    except Exception:
+        diagnostics['heteroscedasticity_p'] = None
+
+    # Residual statistics
+    diagnostics['residual_mean'] = np.mean(residuals)
+    diagnostics['residual_std'] = np.std(residuals)
+    diagnostics['residual_skewness'] = stats.skew(residuals)
+    diagnostics['residual_kurtosis'] = stats.kurtosis(residuals)
+
+    # Print summary
+    print(f"\n{'='*60}")
+    print(f"RESIDUAL DIAGNOSTICS SUMMARY")
+    print(f"{'='*60}")
+    print(f"Sample size: {n}")
+    print(f"\nNormality (Shapiro-Wilk):")
+    print(f"  Statistic: {diagnostics['shapiro_statistic']:.4f}")
+    print(f"  p-value: {diagnostics['shapiro_p_value']:.4f}")
+    print(f"  Status: {diagnostics['normality_assumption']}")
+
+    if diagnostics.get('durbin_watson'):
+        print(f"\nAutocorrelation (Durbin-Watson):")
+        print(f"  Statistic: {diagnostics['durbin_watson']:.4f}")
+        print(f"  Status: {diagnostics['autocorrelation']}")
+
+    if diagnostics.get('heteroscedasticity_p'):
+        print(f"\nHomoscedasticity (Spearman correlation):")
+        print(f"  p-value: {diagnostics['heteroscedasticity_p']:.4f}")
+        print(f"  Status: {diagnostics['homoscedasticity']}")
+
+    print(f"\nResidual Statistics:")
+    print(f"  Mean: {diagnostics['residual_mean']:.4f} (should be ~0)")
+    print(f"  Std: {diagnostics['residual_std']:.4f}")
+    print(f"  Skewness: {diagnostics['residual_skewness']:.4f} (should be ~0)")
+    print(f"  Kurtosis: {diagnostics['residual_kurtosis']:.4f} (should be ~0)")
+    print(f"{'='*60}")
+
+    return fig, diagnostics
+
+
+def run_model_diagnostics(
+    fitter,
+    df_test: pd.DataFrame,
+    model_name: str = 'park_intercept',
+    target_name: str = 'strikeouts',
+    save_path: str = None
+) -> Dict[str, any]:
+    """
+    Run full diagnostic suite for a mixed-effects model.
+
+    Parameters
+    ----------
+    fitter : MixedEffectsModelFitter
+        Fitted model fitter
+    df_test : pd.DataFrame
+        Test data
+    model_name : str
+        Which model to diagnose
+    target_name : str
+        Name of target for display
+    save_path : str, optional
+        Path to save diagnostic plots
+
+    Returns
+    -------
+    Dict containing diagnostic results and figures
+    """
+    # Get predictions
+    y_true = df_test[fitter.target].values
+    y_pred = fitter.predict(df_test, model_name)
+
+    # Filter NaN values
+    valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
+    y_true = y_true[valid_mask]
+    y_pred = y_pred[valid_mask]
+
+    # Run diagnostics
+    fig, diagnostics = plot_residual_diagnostics(
+        y_true, y_pred,
+        title_prefix=f'{target_name.title()} - {model_name}'
+    )
+
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Saved diagnostic plot to {save_path}")
+
+    # Add model info
+    diagnostics['model_name'] = model_name
+    diagnostics['target'] = target_name
+    diagnostics['n_samples'] = len(y_true)
+
+    # Add model R² metrics
+    try:
+        r2_metrics = fitter.compute_r_squared(model_name)
+        diagnostics['marginal_r2'] = r2_metrics['marginal_r2']
+        diagnostics['conditional_r2'] = r2_metrics['conditional_r2']
+    except Exception as e:
+        diagnostics['r2_error'] = str(e)
+
+    return {'figure': fig, 'diagnostics': diagnostics}
+
+
 def plot_coefficient_importance(
     coefs_df: pd.DataFrame,
     top_n: int = 20,
