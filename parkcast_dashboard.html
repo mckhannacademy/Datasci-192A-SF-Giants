@@ -86,7 +86,7 @@
   .kpi-value.up { color: var(--green); }
   .kpi-value.down { color: var(--red); }
   .kpi-value.neutral { color: var(--text1); }
-  .kpi-desc { font-size: 11px; color: var(--text2); }
+  .kpi-desc { font-size: 14px; color: var(--text0); }
   .kpi-conf { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
   .kpi-conf-label { font-size: 10px; color: var(--text2); }
   .kpi-conf-bar { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; }
@@ -189,12 +189,10 @@
     </div>
   </div>
   <div class="body">
+    <!-- EDIT 2: Sidebar reordered — inputs/run button ABOVE stadium search/list -->
     <div class="sidebar">
-      <div>
-        <div class="sidebar-section-label">Stadium</div>
-        <input class="stadium-search" type="text" placeholder="Search stadiums..." oninput="filterStadiums(this.value)">
-        <div class="stadium-list" id="stadium-list"></div>
-      </div>
+ 
+      <!-- DATE & GAME TIME -->
       <div class="date-block">
         <div class="sidebar-section-label">Date &amp; Game Time</div>
         <label>Game Date</label>
@@ -207,6 +205,8 @@
           <option value="20">8:05 PM</option>
         </select>
       </div>
+ 
+      <!-- WEATHER INPUTS -->
       <div class="weather-inputs">
         <div class="sidebar-section-label">Weather at First Pitch</div>
         <div class="wx-row">
@@ -230,6 +230,8 @@
           <input type="range" min="2890" max="3050" value="2992" id="wx-press" oninput="updateWx()">
         </div>
       </div>
+ 
+      <!-- DAY/NIGHT TOGGLE -->
       <div class="dn-toggle-wrap">
         <div class="dn-toggle-label">Game Type</div>
         <div class="dn-toggle">
@@ -237,12 +239,27 @@
           <button class="dn-btn" id="dn-night" onclick="setDayNight('night')">&#9790; Night</button>
         </div>
       </div>
+ 
+      <!-- GITHUB PAT -->
       <div class="pat-wrap">
         <div class="sidebar-section-label">GitHub Access</div>
         <input class="pat-input" type="password" id="gh-pat" placeholder="Paste GitHub PAT…" oninput="onPatInput()">
         <div class="pat-status idle" id="pat-status">No token — using placeholder data</div>
       </div>
+ 
+      <!-- RUN BUTTON -->
       <button class="run-btn" onclick="runModel()">&#9654; Run Projection</button>
+ 
+      <!-- DIVIDER between controls and stadium list -->
+      <div class="sidebar-divider"></div>
+ 
+      <!-- STADIUM SEARCH & LIST -->
+      <div>
+        <div class="sidebar-section-label">Stadium</div>
+        <input class="stadium-search" type="text" placeholder="Search stadiums..." oninput="filterStadiums(this.value)">
+        <div class="stadium-list" id="stadium-list"></div>
+      </div>
+ 
     </div>
     <div class="main" id="main-content"></div>
   </div>
@@ -382,7 +399,9 @@ async function fetchStadiumPhoto(abbr) {
   const pat = getPAT();
   if (!pat) { PHOTO_CACHE[abbr] = null; return null; }
 
-  const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' };
+  // Filename uses the same abbr as in the repo: e.g. SF.jpeg, AZ.jpeg, ATH.jpeg
+  // Map dashboard abbr back to the filename abbr used in Stadium Photos folder
+  const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' }; // reverse of CSV_ABBR_FIX
   const fileAbbr = PHOTO_ABBR[abbr] || abbr;
 
   try {
@@ -390,16 +409,11 @@ async function fetchStadiumPhoto(abbr) {
       `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/Stadium%20Photos/${fileAbbr}.jpeg`,
       { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
-    if (!res.ok) {
-      const j = await res.json();
-      console.warn(`Photo fetch failed for ${abbr} (${fileAbbr}.jpeg): ${res.status} — ${j.message}`);
-      PHOTO_CACHE[abbr] = null; return null;
-    }
+    if (!res.ok) { PHOTO_CACHE[abbr] = null; return null; }
     const json = await res.json();
     PHOTO_CACHE[abbr] = `data:image/jpeg;base64,${json.content.replace(/\n/g, '')}`;
     return PHOTO_CACHE[abbr];
   } catch (e) {
-    console.warn(`Photo fetch error for ${abbr}:`, e.message);
     PHOTO_CACHE[abbr] = null;
     return null;
   }
@@ -695,16 +709,20 @@ function computeAirDensity(tempF, rhum, presHpa = 1013.25) {
   return pD / (287.05 * tempK) + (e * 100) / (461.5 * tempK);
 }
 
-// Decompose wind direction into unit vector components toward CF, LCF, RCF
-// Returns values in range -1 to +1 (pure directional, NOT multiplied by speed)
+// Decompose wind speed + direction into CF, LCF, RCF components
 // stadiumOrientation = compass bearing of CF from home plate
 function computeWindComponents(wspdMph, windDirDeg, stadiumOrientation) {
-  const relDeg = ((windDirDeg - stadiumOrientation) + 360) % 360;
-  const relRad = relDeg * Math.PI / 180;
-  // Unit vector components — positive = blowing toward that field zone
-  const wind_cf  = Math.cos(relRad);
-  const wind_lcf = Math.cos((relDeg - 30) * Math.PI / 180);
-  const wind_rcf = Math.cos((relDeg + 30) * Math.PI / 180);
+  // Angle of wind arrival relative to outfield orientation
+  // windDirDeg is the direction the wind is blowing FROM (meteorological)
+  // We want the component blowing toward CF (outward from home plate)
+  const relDeg  = ((windDirDeg - stadiumOrientation) + 360) % 360;
+  const relRad  = relDeg * Math.PI / 180;
+  // CF component: positive = blowing out toward CF
+  const wind_cf  = wspdMph * Math.cos(relRad);
+  // LCF component: positive = blowing toward left-center
+  const wind_lcf = wspdMph * Math.cos((relDeg - 30) * Math.PI / 180);
+  // RCF component: positive = blowing toward right-center
+  const wind_rcf = wspdMph * Math.cos((relDeg + 30) * Math.PI / 180);
   return { wind_cf, wind_lcf, wind_rcf };
 }
 
@@ -752,7 +770,8 @@ function computeProjection(wx, stadium) {
 
   // Baseline (neutral conditions, same park) for delta display
   const neutralWx = { temp: 72, hum: 62, wind: 7.6, winddir: stadium.orientation, press: 29.92, dayNight: 'day' };
-  const neutralAD = computeAirDensity(72, 62, 29.92 * 33.8639);
+  const neutralPresHpa = 1013.25;
+  const neutralAD = computeAirDensity(72, 62, 1013.25);
   const neutralWC = computeWindComponents(7.6, stadium.orientation, stadium.orientation);
   const neutralWOI = 7.6 * neutralWC.wind_cf;
   const neutralRaw = { temp_f:72, rhum:62, wspd_mph:7.6,
@@ -1014,7 +1033,7 @@ function renderMain() {
     <div class="section-divider">
       <div class="section-divider-label">Seasonal Weather Distributions</div>
       <div class="section-divider-line"></div>
-      <div class="panel-tag">Game-time hourly · ${stadiumRows ? 'Real data' : 'Load PAT to populate'}</div>
+      <div class="panel-tag">2020–2025 · game-time hourly · MOCK DATA</div>
     </div>
     <div class="dist-row">
       <div class="dist-card">
@@ -1497,20 +1516,13 @@ function renderParkFactorChart(p) {
         }
       },
       scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: '#5e6e8a', font: { family: 'DM Mono', size: 11 } }
-        },
-        y: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#5e6e8a', font: { size: 10 } },
-          title: { display: true, text: 'Park factor', color: '#5e6e8a', font: { size: 10 } }
-        }
+              x: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { family: 'DM Mono', size: 11 } }, title: { display: true, text: 'Game Year', color: '#FFFFFF', font: { size: 10 } } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
+            }
+          }
+        });
       }
-    }
-  });
-}
-
+      
 renderStadiumList();
 renderMain();
 </script>
