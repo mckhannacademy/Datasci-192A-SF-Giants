@@ -1,21 +1,27 @@
 {
   "_metadata": {
-    "version": "2.0.0",
-    "model_type": "park_intercept",
-    "generated_at": "2026-04-22",
+    "version": "2.1.0",
+    "model_type": "park_weather_interaction",
+    "generated_at": "2026-05-04",
     "training_seasons": [2021, 2022],
     "test_seasons": [2023, 2024, 2025],
     "scaler_type": "robust",
-    "features_used": ["temp_f", "rhum", "wspd_mph", "wind_cf", "air_density", "is_night"],
+    "features_used": ["temp_f", "wspd_mph", "wind_cf", "is_night"],
+    "interaction_features": ["temp_f", "wspd_mph", "wind_cf"],
+    "n_interaction_terms": 90,
     "features_removed": {
+      "rhum": "not significant for park interactions",
+      "air_density": "highly correlated with temp_f",
       "wind_lcf": "multicollinearity with wind_cf (r > 0.94)",
       "wind_rcf": "multicollinearity with wind_cf (r > 0.94)",
       "wind_out_impact": "not statistically significant (p > 0.65)"
     },
     "notes": [
-      "Model uses park_intercept (not park_slopes) for stability",
-      "RobustScaler used instead of StandardScaler for outlier robustness",
-      "Bonferroni correction applied for multiple comparisons"
+      "Model uses Ridge regression with park × weather interaction terms",
+      "Each park has unique coefficients for temp_f, wspd_mph, and wind_cf",
+      "Total effect = fixed_effect + park_weather_interaction",
+      "RobustScaler used for outlier robustness",
+      "90 interaction terms (3 weather features × 30 parks)"
     ]
   },
   "scaling": {
@@ -86,6 +92,39 @@
       "TEX": -0.78,
       "TOR": -0.33,
       "WSH": 0.02
+    },
+    "park_weather_interactions": {
+      "_note": "Park-specific deviations from fixed weather effects. Total effect = fixed + interaction.",
+      "ARI": {"temp_f": 0.02, "wspd_mph": -0.01, "wind_cf": -0.02},
+      "ATL": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "BAL": {"temp_f": -0.01, "wspd_mph": 0.02, "wind_cf": 0.03},
+      "BOS": {"temp_f": 0.03, "wspd_mph": 0.02, "wind_cf": 0.04},
+      "CHC": {"temp_f": 0.02, "wspd_mph": 0.03, "wind_cf": 0.05},
+      "CIN": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.02},
+      "CLE": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "COL": {"temp_f": 0.08, "wspd_mph": 0.02, "wind_cf": 0.03},
+      "CWS": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "DET": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "HOU": {"temp_f": -0.02, "wspd_mph": -0.01, "wind_cf": -0.01},
+      "KC": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "LAA": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "LAD": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.02},
+      "MIA": {"temp_f": -0.02, "wspd_mph": -0.01, "wind_cf": -0.02},
+      "MIL": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "MIN": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "NYM": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "NYY": {"temp_f": 0.02, "wspd_mph": 0.01, "wind_cf": 0.03},
+      "OAK": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "PHI": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.02},
+      "PIT": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "SD": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "SEA": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "SF": {"temp_f": -0.03, "wspd_mph": 0.05, "wind_cf": 0.08},
+      "STL": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "TB": {"temp_f": -0.02, "wspd_mph": -0.01, "wind_cf": -0.02},
+      "TEX": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "TOR": {"temp_f": -0.01, "wspd_mph": -0.01, "wind_cf": -0.01},
+      "WSH": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01}
     }
   },
   "runs": {
@@ -133,6 +172,39 @@
       "TEX": 0.39,
       "TOR": 0.24,
       "WSH": 0.13
+    },
+    "park_weather_interactions": {
+      "_note": "Park-specific deviations from fixed weather effects. Total effect = fixed + interaction.",
+      "ARI": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": -0.01},
+      "ATL": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "BAL": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "BOS": {"temp_f": 0.02, "wspd_mph": 0.01, "wind_cf": 0.03},
+      "CHC": {"temp_f": 0.01, "wspd_mph": 0.02, "wind_cf": 0.03},
+      "CIN": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "CLE": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "COL": {"temp_f": 0.05, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "CWS": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "DET": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "HOU": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "KC": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "LAA": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "LAD": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "MIA": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": -0.01},
+      "MIL": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "MIN": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "NYM": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "NYY": {"temp_f": 0.01, "wspd_mph": 0.01, "wind_cf": 0.02},
+      "OAK": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "PHI": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "PIT": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "SD": {"temp_f": 0.01, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "SEA": {"temp_f": 0.00, "wspd_mph": 0.01, "wind_cf": 0.01},
+      "SF": {"temp_f": -0.02, "wspd_mph": 0.03, "wind_cf": 0.05},
+      "STL": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01},
+      "TB": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": -0.01},
+      "TEX": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "TOR": {"temp_f": -0.01, "wspd_mph": 0.00, "wind_cf": 0.00},
+      "WSH": {"temp_f": 0.00, "wspd_mph": 0.00, "wind_cf": 0.01}
     }
   }
 }

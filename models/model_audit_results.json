@@ -1,0 +1,90 @@
+{
+  "strikeouts": {
+    "ridge_vs_lasso": {
+      "ridge_nonzero": 124,
+      "lasso_nonzero": 25,
+      "lasso_zeroed_interactions": 88,
+      "ridge_test_r2": 0.004440096137443783,
+      "lasso_test_r2": 0.011699695578586189,
+      "ridge_test_rmse": 2.9457374491215926,
+      "lasso_test_rmse": 2.934977674072363
+    },
+    "bootstrap_ci": {
+      "total_interactions": 90,
+      "significant_at_95": 15,
+      "pct_significant": 16.666666666666664
+    },
+    "baseline_comparison": {
+      "full_test_r2": 0.004440096137443783,
+      "baseline_test_r2": 0.0034288569976884675,
+      "test_r2_improvement": 0.0010112391397553155,
+      "full_test_rmse": 2.9457374491215926,
+      "baseline_test_rmse": 2.9472331345828806
+    },
+    "domed_validation": {
+      "n_violations": 7,
+      "domed_mean_abs_coef": 0.13191472364387768,
+      "outdoor_mean_abs_coef": 0.12157466717949728,
+      "violations": [
+        "TB",
+        "MIA",
+        "HOU",
+        "ARI",
+        "TOR",
+        "MIL",
+        "SEA"
+      ]
+    },
+    "reduced_model": {
+      "full_interactions": 90,
+      "reduced_interactions": 30,
+      "full_test_r2": 0.004440096137443783,
+      "reduced_test_r2": 0.003770775485388178,
+      "test_r2_improvement": -0.000669320652055605
+    }
+  },
+  "runs": {
+    "ridge_vs_lasso": {
+      "ridge_nonzero": 124,
+      "lasso_nonzero": 23,
+      "lasso_zeroed_interactions": 85,
+      "ridge_test_r2": 0.006423950730321981,
+      "lasso_test_r2": 0.011175416169725172,
+      "ridge_test_rmse": 3.262433606875166,
+      "lasso_test_rmse": 3.2546234762051953
+    },
+    "bootstrap_ci": {
+      "total_interactions": 90,
+      "significant_at_95": 16,
+      "pct_significant": 17.77777777777778
+    },
+    "baseline_comparison": {
+      "full_test_r2": 0.006423950730321981,
+      "baseline_test_r2": 0.007499478794375514,
+      "test_r2_improvement": -0.0010755280640535325,
+      "full_test_rmse": 3.262433606875166,
+      "baseline_test_rmse": 3.260667366142107
+    },
+    "domed_validation": {
+      "n_violations": 7,
+      "domed_mean_abs_coef": 0.1218939393715982,
+      "outdoor_mean_abs_coef": 0.10849920977417536,
+      "violations": [
+        "TB",
+        "MIA",
+        "HOU",
+        "TOR",
+        "MIL",
+        "SEA",
+        "TEX"
+      ]
+    },
+    "reduced_model": {
+      "full_interactions": 90,
+      "reduced_interactions": 30,
+      "full_test_r2": 0.006423950730321981,
+      "reduced_test_r2": 0.0074501663195876144,
+      "test_r2_improvement": 0.0010262155892656333
+    }
+  }
+}

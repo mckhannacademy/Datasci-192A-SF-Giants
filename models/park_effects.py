@@ -419,6 +419,201 @@ def plot_variance_decomposition(
     return ax
 
 
+def plot_park_weather_heatmap(
+    model: 'ParkWeatherInteractionModel' = None,
+    coef_df: pd.DataFrame = None,
+    weather_features: List[str] = None,
+    target: str = 'strikeouts',
+    show_interactions_only: bool = False,
+    figsize: Tuple[int, int] = (12, 14),
+    cmap: str = 'RdBu_r',
+    annot_fmt: str = '.3f'
+) -> plt.Figure:
+    """
+    Create heatmap of park-specific weather sensitivities.
+
+    Shows how each park responds to different weather features, making it
+    easy to identify parks with unusual weather sensitivity patterns.
+
+    Parameters
+    ----------
+    model : ParkWeatherInteractionModel, optional
+        Fitted interaction model. If provided, extracts coefficients automatically.
+    coef_df : pd.DataFrame, optional
+        Pre-computed coefficient DataFrame (alternative to model).
+        Must have parks as index and weather features as columns.
+    weather_features : List[str], optional
+        Weather features to include. If None, uses ['temp_f', 'wspd_mph', 'wind_cf'].
+    target : str
+        Target variable name (for title)
+    show_interactions_only : bool
+        If True, show only interaction effects (park deviation from average).
+        If False, show total effects (fixed + interaction).
+    figsize : tuple
+        Figure size
+    cmap : str
+        Colormap name
+    annot_fmt : str
+        Format string for annotations
+
+    Returns
+    -------
+    plt.Figure
+        Matplotlib figure object
+    """
+    if weather_features is None:
+        weather_features = ['temp_f', 'wspd_mph', 'wind_cf']
+
+    # Get coefficient data
+    if model is not None:
+        if show_interactions_only:
+            coef_df = model.get_interaction_coefficients()
+        else:
+            coef_df = model.get_park_weather_coefficients()
+        coef_df = coef_df[weather_features]
+    elif coef_df is None:
+        raise ValueError("Must provide either model or coef_df")
+    else:
+        # Filter to requested weather features
+        coef_df = coef_df[[c for c in weather_features if c in coef_df.columns]]
+
+    # Sort parks by total sensitivity for better visualization
+    coef_df['_total'] = coef_df.abs().sum(axis=1)
+    coef_df = coef_df.sort_values('_total', ascending=False).drop('_total', axis=1)
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Create heatmap
+    sns.heatmap(
+        coef_df,
+        cmap=cmap,
+        center=0,
+        annot=True,
+        fmt=annot_fmt,
+        ax=ax,
+        cbar_kws={'label': 'Coefficient'},
+        linewidths=0.5
+    )
+
+    # Labels
+    effect_type = "Interaction Effects" if show_interactions_only else "Total Effects"
+    ax.set_title(f'Park Weather Sensitivities: {target.capitalize()} ({effect_type})')
+    ax.set_xlabel('Weather Feature')
+    ax.set_ylabel('Park')
+
+    # Add park names to y-axis labels
+    labels = [f"{p} ({PARK_INFO.get(p, {}).get('name', p)[:15]})"
+              for p in coef_df.index]
+    ax.set_yticklabels(labels, fontsize=9)
+
+    plt.tight_layout()
+    return fig
+
+
+def summarize_park_sensitivities(
+    model: 'ParkWeatherInteractionModel' = None,
+    coef_df: pd.DataFrame = None,
+    weather_features: List[str] = None,
+    top_n: int = 10
+) -> Dict[str, pd.DataFrame]:
+    """
+    Rank parks by their weather sensitivity.
+
+    Returns rankings for:
+    - Overall sensitivity (sum of |coefficients|)
+    - Each individual weather feature
+    - High/low sensitivity parks for each feature
+
+    Parameters
+    ----------
+    model : ParkWeatherInteractionModel, optional
+        Fitted interaction model
+    coef_df : pd.DataFrame, optional
+        Pre-computed total effect DataFrame
+    weather_features : List[str], optional
+        Weather features to analyze
+    top_n : int
+        Number of top/bottom parks to highlight
+
+    Returns
+    -------
+    Dict with:
+        - 'overall': Overall sensitivity ranking
+        - 'by_feature': Dict with rankings per feature
+        - 'summary': Text summary of key findings
+    """
+    if weather_features is None:
+        weather_features = ['temp_f', 'wspd_mph', 'wind_cf']
+
+    if model is not None:
+        coef_df = model.get_park_weather_coefficients()
+        coef_df = coef_df[weather_features]
+    elif coef_df is None:
+        raise ValueError("Must provide either model or coef_df")
+
+    results = {}
+
+    # Overall sensitivity
+    overall = coef_df.abs().sum(axis=1).sort_values(ascending=False)
+    results['overall'] = pd.DataFrame({
+        'Park': overall.index,
+        'Total_Sensitivity': overall.values,
+        'Rank': range(1, len(overall) + 1)
+    })
+
+    # By feature
+    results['by_feature'] = {}
+    for feat in weather_features:
+        if feat in coef_df.columns:
+            feat_vals = coef_df[feat].sort_values(ascending=False)
+            results['by_feature'][feat] = pd.DataFrame({
+                'Park': feat_vals.index,
+                f'{feat}_effect': feat_vals.values,
+                'Rank': range(1, len(feat_vals) + 1)
+            })
+
+    # Summary text
+    summary_lines = [
+        "PARK WEATHER SENSITIVITY SUMMARY",
+        "=" * 40,
+        "",
+        f"Top {top_n} Most Weather-Sensitive Parks (Overall):",
+    ]
+    for i, (park, sensitivity) in enumerate(zip(overall.index[:top_n], overall.values[:top_n])):
+        name = PARK_INFO.get(park, {}).get('name', park)
+        summary_lines.append(f"  {i+1}. {park} ({name}): {sensitivity:.3f}")
+
+    summary_lines.extend([
+        "",
+        f"Bottom {top_n} Least Weather-Sensitive Parks:",
+    ])
+    bottom = overall.sort_values(ascending=True)[:top_n]
+    for i, (park, sensitivity) in enumerate(zip(bottom.index, bottom.values)):
+        name = PARK_INFO.get(park, {}).get('name', park)
+        summary_lines.append(f"  {i+1}. {park} ({name}): {sensitivity:.3f}")
+
+    summary_lines.extend([
+        "",
+        "Feature-Specific Insights:",
+    ])
+
+    for feat in weather_features:
+        if feat in results['by_feature']:
+            feat_df = results['by_feature'][feat]
+            high_park = feat_df.iloc[0]['Park']
+            high_val = feat_df.iloc[0][f'{feat}_effect']
+            low_park = feat_df.iloc[-1]['Park']
+            low_val = feat_df.iloc[-1][f'{feat}_effect']
+            summary_lines.append(f"  {feat}:")
+            summary_lines.append(f"    Highest: {high_park} ({high_val:+.3f})")
+            summary_lines.append(f"    Lowest:  {low_park} ({low_val:+.3f})")
+
+    results['summary'] = "\n".join(summary_lines)
+
+    return results
+
+
 def compare_park_weather_sensitivity(
     strikeouts_fitter: MixedEffectsModelFitter,
     runs_fitter: MixedEffectsModelFitter,
@@ -537,6 +732,142 @@ def create_park_effects_report(
         fig_var.savefig(output_path / 'variance_decomposition.png', dpi=150, bbox_inches='tight')
         fig_re.savefig(output_path / 'park_random_effects.png', dpi=150, bbox_inches='tight')
         print(f"Figures saved to {output_path}")
+
+    return results
+
+
+def create_park_weather_interaction_report(
+    k_model: 'ParkWeatherInteractionModel',
+    runs_model: 'ParkWeatherInteractionModel',
+    output_dir: str = None,
+    show_plots: bool = True
+) -> Dict[str, any]:
+    """
+    Generate comprehensive park-weather interaction report.
+
+    This function creates visualizations and summaries for the
+    park × weather interaction models, highlighting:
+    - Which parks are most/least weather sensitive
+    - Park-specific responses to each weather feature
+    - Comparison between strikeouts and runs sensitivities
+
+    Parameters
+    ----------
+    k_model : ParkWeatherInteractionModel
+        Fitted strikeouts model
+    runs_model : ParkWeatherInteractionModel
+        Fitted runs model
+    output_dir : str, optional
+        Directory to save figures and CSVs
+    show_plots : bool
+        Whether to display plots interactively
+
+    Returns
+    -------
+    Dict with:
+        - 'k_sensitivities': Strikeouts sensitivity rankings
+        - 'runs_sensitivities': Runs sensitivity rankings
+        - 'k_interactions': Strikeouts interaction coefficients
+        - 'runs_interactions': Runs interaction coefficients
+        - 'figures': Dict of matplotlib figures
+    """
+    from pathlib import Path
+
+    results = {}
+
+    # Get sensitivity summaries
+    print("Analyzing strikeouts model...")
+    k_sens = summarize_park_sensitivities(k_model)
+    results['k_sensitivities'] = k_sens
+    print(k_sens['summary'])
+
+    print("\n" + "=" * 60 + "\n")
+
+    print("Analyzing runs model...")
+    runs_sens = summarize_park_sensitivities(runs_model)
+    results['runs_sensitivities'] = runs_sens
+    print(runs_sens['summary'])
+
+    # Get interaction coefficients
+    results['k_interactions'] = k_model.get_interaction_coefficients()
+    results['runs_interactions'] = runs_model.get_interaction_coefficients()
+
+    # Create figures
+    figures = {}
+
+    # Heatmap for strikeouts
+    print("\nCreating visualizations...")
+    fig_k = plot_park_weather_heatmap(
+        model=k_model,
+        target='strikeouts',
+        show_interactions_only=False
+    )
+    figures['k_heatmap'] = fig_k
+
+    # Heatmap for runs
+    fig_runs = plot_park_weather_heatmap(
+        model=runs_model,
+        target='runs',
+        show_interactions_only=False
+    )
+    figures['runs_heatmap'] = fig_runs
+
+    # Side-by-side comparison of key parks
+    key_parks = ['SF', 'COL', 'CHC', 'TB', 'MIA', 'ARI']
+    fig_compare, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    for ax, (model, target) in zip(axes, [(k_model, 'Strikeouts'), (runs_model, 'Runs')]):
+        coef_df = model.get_park_weather_coefficients()
+        key_df = coef_df.loc[[p for p in key_parks if p in coef_df.index]]
+
+        x = np.arange(len(key_df.index))
+        width = 0.25
+
+        for i, feat in enumerate(['temp_f', 'wspd_mph', 'wind_cf']):
+            ax.bar(x + i*width, key_df[feat], width, label=feat)
+
+        ax.set_xticks(x + width)
+        ax.set_xticklabels(key_df.index)
+        ax.set_ylabel('Total Weather Effect')
+        ax.set_title(f'{target}: Key Park Comparison')
+        ax.legend()
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+
+    plt.tight_layout()
+    figures['key_parks_comparison'] = fig_compare
+
+    results['figures'] = figures
+
+    # Save outputs if directory provided
+    if output_dir:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Save figures
+        fig_k.savefig(output_path / 'strikeouts_park_weather_heatmap.png', dpi=150, bbox_inches='tight')
+        fig_runs.savefig(output_path / 'runs_park_weather_heatmap.png', dpi=150, bbox_inches='tight')
+        fig_compare.savefig(output_path / 'key_parks_comparison.png', dpi=150, bbox_inches='tight')
+
+        # Save CSVs
+        results['k_interactions'].to_csv(output_path / 'strikeouts_park_interactions.csv')
+        results['runs_interactions'].to_csv(output_path / 'runs_park_interactions.csv')
+        k_sens['overall'].to_csv(output_path / 'strikeouts_sensitivity_ranking.csv', index=False)
+        runs_sens['overall'].to_csv(output_path / 'runs_sensitivity_ranking.csv', index=False)
+
+        # Save summary text
+        with open(output_path / 'sensitivity_summary.txt', 'w') as f:
+            f.write("STRIKEOUTS MODEL\n")
+            f.write("=" * 60 + "\n")
+            f.write(k_sens['summary'])
+            f.write("\n\n")
+            f.write("RUNS MODEL\n")
+            f.write("=" * 60 + "\n")
+            f.write(runs_sens['summary'])
+
+        print(f"\nOutputs saved to {output_path}")
+
+    if show_plots:
+        plt.show()
 
     return results
 

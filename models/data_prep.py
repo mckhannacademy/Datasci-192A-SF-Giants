@@ -596,6 +596,80 @@ def train_test_split_by_season(
     return splits
 
 
+def create_random_month_split(
+    df: pd.DataFrame,
+    test_size: float = 0.30,
+    random_state: int = 42
+) -> Tuple[np.ndarray, np.ndarray, List[str], List[str]]:
+    """
+    Create train/test split by randomly assigning year-month units.
+
+    Each year-month combination (e.g., "2021-06", "2022-08") is treated as a
+    separate unit and randomly assigned to either train or test set. This tests
+    whether the model generalizes across time rather than only forward in time.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset with 'game_date' column (datetime)
+    test_size : float
+        Proportion of month-units to assign to test set (default: 0.30 = 30%)
+    random_state : int
+        Random seed for reproducibility (default: 42)
+
+    Returns
+    -------
+    Tuple containing:
+        - train_mask: Boolean array for training rows
+        - test_mask: Boolean array for test rows
+        - train_months: List of year-month strings in train set
+        - test_months: List of year-month strings in test set
+
+    Example
+    -------
+    >>> train_mask, test_mask, train_months, test_months = create_random_month_split(df)
+    >>> print(f"Train months: {len(train_months)}, Test months: {len(test_months)}")
+    """
+    # Ensure game_date is datetime
+    if not pd.api.types.is_datetime64_any_dtype(df['game_date']):
+        df = df.copy()
+        df['game_date'] = pd.to_datetime(df['game_date'])
+
+    # Create year-month identifier for each game
+    year_months = df['game_date'].dt.to_period('M').astype(str)
+
+    # Get unique year-month units
+    unique_months = sorted(year_months.unique())
+    n_months = len(unique_months)
+    n_test = int(np.ceil(n_months * test_size))
+    n_train = n_months - n_test
+
+    # Randomly assign months to train/test
+    np.random.seed(random_state)
+    shuffled_indices = np.random.permutation(n_months)
+
+    train_month_indices = shuffled_indices[:n_train]
+    test_month_indices = shuffled_indices[n_train:]
+
+    train_months = [unique_months[i] for i in sorted(train_month_indices)]
+    test_months = [unique_months[i] for i in sorted(test_month_indices)]
+
+    # Create boolean masks
+    train_mask = year_months.isin(train_months).values
+    test_mask = year_months.isin(test_months).values
+
+    print(f"\nRandom Month Split (seed={random_state}):")
+    print(f"  Total month-units: {n_months}")
+    print(f"  Train months: {n_train} ({100*n_train/n_months:.1f}%)")
+    print(f"  Test months: {n_test} ({100*n_test/n_months:.1f}%)")
+    print(f"  Train games: {train_mask.sum()}")
+    print(f"  Test games: {test_mask.sum()}")
+    print(f"\n  Train months sample: {train_months[:5]}...")
+    print(f"  Test months sample: {test_months[:5]}...")
+
+    return train_mask, test_mask, train_months, test_months
+
+
 def prepare_nn_data(
     df: pd.DataFrame,
     test_start_season: int = 2023
@@ -1224,6 +1298,237 @@ def prepare_deviation_data(
         print(f"    Runs deviation: mean={dev_runs.mean():.3f}, std={dev_runs.std():.3f}")
 
     return me_data
+
+
+# ============================================================================
+# PARK-WEATHER INTERACTION FUNCTIONS
+# ============================================================================
+
+def prepare_park_weather_interactions(
+    df: pd.DataFrame,
+    weather_features: List[str] = ['temp_f', 'wspd_mph', 'wind_cf'],
+    standardize: bool = True,
+    test_start_season: int = 2023,
+    scaler_type: str = 'robust',
+    split_method: str = 'season',
+    test_size: float = 0.30,
+    random_state: int = 42
+) -> Dict[str, any]:
+    """
+    Prepare data for Ridge/Lasso regression with explicit park × weather interactions.
+
+    This function creates a feature matrix with:
+    - Main weather effects (3 features): temp_f, wspd_mph, wind_cf
+    - Park indicator dummies (30 features): park_ARI, ..., park_WSH
+    - Park × weather interactions (90 features): temp_f_x_ARI, ..., wind_cf_x_WSH
+    - Day/night indicator (1 feature): is_night
+
+    Total: ~124 columns (may vary based on parks present in data)
+
+    The interaction terms allow each park to have its own weather sensitivity,
+    enabling insights like:
+    - Oracle Park has high wind_cf sensitivity (marine layer)
+    - Coors Field has high temp_f sensitivity (altitude)
+    - Domed stadiums have near-zero weather sensitivity
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Combined dataset from load_all_team_data with weather columns and home_team
+    weather_features : List[str]
+        Weather features to include in interactions.
+        Default: ['temp_f', 'wspd_mph', 'wind_cf'] (3 features × 30 parks = 90 interactions)
+    standardize : bool
+        Whether to standardize weather features before creating interactions.
+        Recommended: True for Ridge/Lasso regularization to work properly.
+    test_start_season : int
+        First season to include in test set (default: 2023). Only used if split_method='season'.
+    scaler_type : str
+        Type of scaler: 'robust' (median/IQR) or 'standard' (mean/std)
+    split_method : str
+        Method for train/test split:
+        - 'season': Split by season (train < test_start_season, test >= test_start_season)
+        - 'random_month': Randomly assign year-month units to train/test
+    test_size : float
+        Proportion of data for test set (default: 0.30). Only used if split_method='random_month'.
+    random_state : int
+        Random seed for reproducibility (default: 42). Only used if split_method='random_month'.
+
+    Returns
+    -------
+    Dict containing:
+        - df_train: Training DataFrame with all features
+        - df_test: Test DataFrame with all features
+        - X_train: Feature matrix (numpy array) for training
+        - X_test: Feature matrix (numpy array) for testing
+        - y_train_strikeouts: Training strikeout targets
+        - y_test_strikeouts: Test strikeout targets
+        - y_train_runs: Training runs targets
+        - y_test_runs: Test runs targets
+        - feature_names: List of all feature column names
+        - weather_features: Weather features used
+        - park_dummies: List of park dummy column names
+        - interaction_features: List of interaction column names
+        - weather_scaler: Fitted scaler object (if standardize=True)
+        - scaling_params: Dict with center/scale for each weather feature
+        - parks: List of unique park codes
+
+    Example
+    -------
+    >>> from data_prep import load_all_team_data, prepare_park_weather_interactions
+    >>> df = load_all_team_data('data')
+    >>> data = prepare_park_weather_interactions(df)
+    >>> print(f"Features: {len(data['feature_names'])}")
+    >>> print(f"Interactions: {len(data['interaction_features'])}")
+    """
+    # Make a copy to avoid modifying original
+    data = df.copy()
+
+    # Ensure required columns exist
+    required_cols = weather_features + [TARGET_STRIKEOUTS, TARGET_RUNS, 'day_night', 'home_team', 'season']
+    missing_cols = [c for c in required_cols if c not in data.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+
+    # Drop rows with missing values in key columns
+    data = data.dropna(subset=required_cols).copy()
+
+    # Convert grouping variables to object dtype for consistency
+    data['home_team'] = data['home_team'].astype(str).astype('object')
+    data['season'] = data['season'].astype(int)
+
+    # Create is_night indicator
+    data['is_night'] = (data['day_night'] == 'night').astype(int)
+
+    # Train/test split based on method
+    if split_method == 'season':
+        # Original method: split by season
+        train_mask = data['season'] < test_start_season
+        test_mask = ~train_mask
+        split_info = {
+            'method': 'season',
+            'test_start_season': test_start_season,
+            'train_seasons': sorted(data.loc[train_mask, 'season'].unique()),
+            'test_seasons': sorted(data.loc[test_mask, 'season'].unique()),
+        }
+        print(f"\nSeason-based split: train < {test_start_season}, test >= {test_start_season}")
+    elif split_method == 'random_month':
+        # New method: random assignment of year-month units
+        train_mask, test_mask, train_months, test_months = create_random_month_split(
+            data, test_size=test_size, random_state=random_state
+        )
+        split_info = {
+            'method': 'random_month',
+            'test_size': test_size,
+            'random_state': random_state,
+            'train_months': train_months,
+            'test_months': test_months,
+        }
+    else:
+        raise ValueError(f"Unknown split_method: {split_method}. Use 'season' or 'random_month'.")
+
+    df_train = data[train_mask].copy().reset_index(drop=True)
+    df_test = data[test_mask].copy().reset_index(drop=True)
+
+    # Get unique parks
+    parks = sorted(df_train['home_team'].unique())
+    print(f"Found {len(parks)} unique parks in training data")
+
+    # Standardize weather features if requested
+    weather_scaler = None
+    scaling_params = {}
+
+    if standardize:
+        if scaler_type == 'robust':
+            weather_scaler = RobustScaler()
+        elif scaler_type == 'standard':
+            weather_scaler = StandardScaler()
+        else:
+            raise ValueError(f"Unknown scaler_type: {scaler_type}")
+
+        # Fit on training data only
+        df_train[weather_features] = weather_scaler.fit_transform(df_train[weather_features])
+        df_test[weather_features] = weather_scaler.transform(df_test[weather_features])
+
+        # Store scaling parameters
+        if scaler_type == 'robust':
+            for i, feat in enumerate(weather_features):
+                scaling_params[feat] = {
+                    'center': weather_scaler.center_[i],
+                    'scale': weather_scaler.scale_[i]
+                }
+        else:
+            for i, feat in enumerate(weather_features):
+                scaling_params[feat] = {
+                    'center': weather_scaler.mean_[i],
+                    'scale': weather_scaler.scale_[i]
+                }
+
+    # Create park dummies (one-hot encoding, keeping all categories for interaction terms)
+    # Use pd.concat to avoid DataFrame fragmentation warnings
+    park_dummies = [f'park_{p}' for p in parks]
+    train_park_dummies = {f'park_{park}': (df_train['home_team'] == park).astype(int) for park in parks}
+    test_park_dummies = {f'park_{park}': (df_test['home_team'] == park).astype(int) for park in parks}
+
+    # Create interaction terms: weather_feature × park_dummy
+    interaction_features = []
+    train_interactions = {}
+    test_interactions = {}
+
+    for weather_feat in weather_features:
+        for park in parks:
+            interaction_name = f'{weather_feat}_x_{park}'
+            interaction_features.append(interaction_name)
+            train_interactions[interaction_name] = df_train[weather_feat].values * train_park_dummies[f'park_{park}'].values
+            test_interactions[interaction_name] = df_test[weather_feat].values * test_park_dummies[f'park_{park}'].values
+
+    # Concatenate all new columns at once to avoid fragmentation
+    df_train = pd.concat([df_train, pd.DataFrame(train_park_dummies, index=df_train.index), pd.DataFrame(train_interactions, index=df_train.index)], axis=1)
+    df_test = pd.concat([df_test, pd.DataFrame(test_park_dummies, index=df_test.index), pd.DataFrame(test_interactions, index=df_test.index)], axis=1)
+
+    # Define feature columns in order: weather, is_night, park dummies, interactions
+    feature_names = weather_features + ['is_night'] + park_dummies + interaction_features
+
+    # Create feature matrices
+    X_train = df_train[feature_names].values
+    X_test = df_test[feature_names].values
+
+    # Extract targets
+    y_train_strikeouts = df_train[TARGET_STRIKEOUTS].values
+    y_test_strikeouts = df_test[TARGET_STRIKEOUTS].values
+    y_train_runs = df_train[TARGET_RUNS].values
+    y_test_runs = df_test[TARGET_RUNS].values
+
+    print(f"\nPark-Weather Interaction Data Prepared:")
+    print(f"  Training samples: {len(df_train)}")
+    print(f"  Test samples: {len(df_test)}")
+    print(f"  Weather features: {len(weather_features)} ({weather_features})")
+    print(f"  Park dummies: {len(park_dummies)}")
+    print(f"  Interaction terms: {len(interaction_features)}")
+    print(f"  Total features: {len(feature_names)}")
+    print(f"  Standardized: {standardize} (scaler: {scaler_type if standardize else 'N/A'})")
+
+    return {
+        'df_train': df_train,
+        'df_test': df_test,
+        'X_train': X_train,
+        'X_test': X_test,
+        'y_train_strikeouts': y_train_strikeouts,
+        'y_test_strikeouts': y_test_strikeouts,
+        'y_train_runs': y_train_runs,
+        'y_test_runs': y_test_runs,
+        'feature_names': feature_names,
+        'weather_features': weather_features,
+        'park_dummies': park_dummies,
+        'interaction_features': interaction_features,
+        'weather_scaler': weather_scaler,
+        'scaling_params': scaling_params,
+        'scaler_type': scaler_type if standardize else None,
+        'parks': parks,
+        'target_strikeouts': TARGET_STRIKEOUTS,
+        'target_runs': TARGET_RUNS,
+        'split_info': split_info,
+    }
 
 
 if __name__ == '__main__':

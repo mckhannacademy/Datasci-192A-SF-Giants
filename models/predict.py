@@ -121,10 +121,16 @@ def predict_game(
     wind_cf: float,
     is_night: bool = False,
     air_density: float = None,
-    params: Dict = None
+    params: Dict = None,
+    use_interactions: bool = True
 ) -> Dict[str, float]:
     """
     Predict away team strikeouts and runs for a game.
+
+    This prediction uses park-specific weather coefficients when available:
+    - Total temp effect = fixed_temp_coef + park_temp_interaction
+    - Total wind effect = fixed_wind_coef + park_wind_interaction
+    - etc.
 
     Parameters
     ----------
@@ -145,6 +151,9 @@ def predict_game(
         Air density in kg/m^3. If None, computes from temp/humidity.
     params : Dict, optional
         Model parameters. If None, loads from default location.
+    use_interactions : bool
+        Whether to use park-specific weather interactions (default: True).
+        Set to False for baseline comparison.
 
     Returns
     -------
@@ -154,6 +163,7 @@ def predict_game(
         - confidence: Model confidence indicators
         - raw_inputs: Raw input values
         - standardized_inputs: Standardized input values
+        - park_interactions: Park-specific weather adjustments used
     """
     if params is None:
         params = load_model_params()
@@ -170,27 +180,60 @@ def predict_game(
 
     # Compute predictions
     results = {}
+    park_interactions_used = {}
+
+    # Weather features that may have park-specific interactions
+    interaction_features = ['temp_f', 'wspd_mph', 'wind_cf']
 
     for target in ['strikeouts', 'runs']:
         fe = params[target]['fixed_effects']
         park_effect = params[target]['park_effects'].get(park, 0.0)
 
-        # Prediction = Intercept + sum(coef * standardized_feature) + park_effect
+        # Check if park-weather interactions are available
+        has_interactions = (
+            use_interactions and
+            'park_weather_interactions' in params[target] and
+            park in params[target]['park_weather_interactions']
+        )
+
+        if has_interactions:
+            park_interactions = params[target]['park_weather_interactions'][park]
+        else:
+            park_interactions = {}
+
+        # Prediction = Intercept + sum((fixed_coef + interaction) * std_feature) + park_effect + is_night
         pred = fe['Intercept']
-        pred += fe['temp_f'] * std_features['temp_f']
-        pred += fe['rhum'] * std_features['rhum']
-        pred += fe['wspd_mph'] * std_features['wspd_mph']
-        pred += fe['wind_cf'] * std_features['wind_cf']
-        pred += fe['air_density'] * std_features['air_density']
-        pred += fe['is_night'] * (1 if is_night else 0)
+
+        # Weather features with potential interactions
+        for feat in interaction_features:
+            fixed_coef = fe.get(feat, 0.0)
+            interaction_coef = park_interactions.get(feat, 0.0)
+            total_coef = fixed_coef + interaction_coef
+            pred += total_coef * std_features[feat]
+
+        # Humidity and air_density (no interactions, if present)
+        if 'rhum' in fe:
+            pred += fe['rhum'] * std_features['rhum']
+        if 'air_density' in fe:
+            pred += fe['air_density'] * std_features['air_density']
+
+        # Night game effect
+        pred += fe.get('is_night', 0.0) * (1 if is_night else 0)
+
+        # Park intercept
         pred += park_effect
 
         results[target] = round(pred, 2)
+        park_interactions_used[target] = park_interactions if has_interactions else None
 
     # Add model R^2 for confidence context
+    # Handle both old format (marginal) and new format (train/test)
+    k_r2 = params['strikeouts'].get('model_r2', {})
+    runs_r2 = params['runs'].get('model_r2', {})
+
     results['model_confidence'] = {
-        'strikeouts_r2': params['strikeouts']['model_r2']['marginal'],
-        'runs_r2': params['runs']['model_r2']['marginal'],
+        'strikeouts_r2': k_r2.get('marginal', k_r2.get('test', 0.0)),
+        'runs_r2': runs_r2.get('marginal', runs_r2.get('test', 0.0)),
         'note': 'Low R^2 indicates weather explains only a small portion of variance'
     }
 
@@ -204,6 +247,10 @@ def predict_game(
         'is_night': is_night
     }
     results['standardized_inputs'] = std_features
+
+    # Include park interactions if used
+    results['park_interactions'] = park_interactions_used
+    results['interactions_enabled'] = use_interactions
 
     return results
 
@@ -265,12 +312,13 @@ def format_prediction(result: Dict) -> str:
     str
         Formatted prediction string
     """
+    park = result['raw_inputs']['park']
     lines = [
         "=" * 50,
         "WEATHER-ADJUSTED PREDICTION",
         "=" * 50,
         "",
-        f"Park: {result['raw_inputs']['park']}",
+        f"Park: {park}",
         f"Temperature: {result['raw_inputs']['temp_f']}°F",
         f"Humidity: {result['raw_inputs']['rhum']}%",
         f"Wind Speed: {result['raw_inputs']['wspd_mph']} mph",
@@ -283,6 +331,25 @@ def format_prediction(result: Dict) -> str:
         "-" * 50,
         f"Strikeouts: {result['strikeouts']:.1f}",
         f"Runs: {result['runs']:.1f}",
+    ]
+
+    # Add park-specific interaction info if available
+    if result.get('interactions_enabled') and result.get('park_interactions'):
+        lines.extend([
+            "",
+            "-" * 50,
+            f"PARK-SPECIFIC WEATHER ADJUSTMENTS ({park})",
+            "-" * 50,
+        ])
+        for target in ['strikeouts', 'runs']:
+            interactions = result['park_interactions'].get(target)
+            if interactions:
+                adj_str = ", ".join([f"{k}: {v:+.2f}" for k, v in interactions.items()])
+                lines.append(f"  {target.capitalize()}: {adj_str}")
+            else:
+                lines.append(f"  {target.capitalize()}: (using fixed effects only)")
+
+    lines.extend([
         "",
         "-" * 50,
         "MODEL CONFIDENCE",
@@ -293,7 +360,7 @@ def format_prediction(result: Dict) -> str:
         "Note: Low R² means weather explains a small portion of variance.",
         "Team quality and other factors have larger effects.",
         "=" * 50,
-    ]
+    ])
     return "\n".join(lines)
 
 
