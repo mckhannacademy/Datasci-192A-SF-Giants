@@ -336,11 +336,11 @@ const MLB_TEAMS = ['ARI','ATL','BAL','BOS','CHC','CIN','CLE','COL','CWS','DET','
 // ── GitHub data layer ─────────────────────────────────────────────
 const GH_API_BASE = 'https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/data';
 const TEAM_SLUG = {
-  ARI:'diamondbacks', ATL:'braves',    BAL:'orioles',   BOS:'red_sox',
+  ARI:'dbacks',       ATL:'braves',    BAL:'orioles',   BOS:'fenway',
   CHC:'cubs',         CIN:'reds',      CLE:'guardians', COL:'rockies',
   CWS:'white_sox',    DET:'tigers',    HOU:'astros',    KC:'royals',
   LAA:'angels',       LAD:'dodgers',   MIA:'marlins',   MIL:'brewers',
-  MIN:'twins',        NYM:'mets',      NYY:'yankees',   OAK:'athletics',
+  MIN:'twins',        NYM:'mets',      NYY:'yankee',    OAK:'athletics',
   PHI:'phillies',     PIT:'pirates',   SD:'padres',     SEA:'mariners',
   SF:'giants',        STL:'cardinals', TB:'rays',       TEX:'rangers',
   TOR:'blue_jays',    WSH:'nationals',
@@ -353,6 +353,8 @@ const CSV_ABBR_FIX = { 'AZ': 'ARI', 'ATH': 'OAK' };
 const DATA_CACHE  = {};
 // Per-stadium photo cache: abbr → base64 data URL (or null)
 const PHOTO_CACHE = {};
+// Cached listing of Stadium Photos directory (fetched once)
+let PHOTO_DIR_CACHE = null;
 // Per-stadium heatmap cache: abbr → { temp_f, pres, rhum, wspd_mph } data URLs
 const HEATMAP_CACHE = {};
 
@@ -368,15 +370,15 @@ async function fetchHeatmapImages(abbr) {
   const folder = FOLDER_ABBR[abbr] || abbr;
   const variables = ['temp_f', 'pres', 'rhum', 'wspd_mph'];
   const fileNames = {
-    temp_f:   'heatmap_temp_f_diff.png',
-    pres:     'heatmap_pres_diff.png',
-    rhum:     'heatmap_rhum_diff.png',
-    wspd_mph: 'heatmap_wspd_mph_diff.png',
+    temp_f:   'heatmap_temp_f_diff_ci.png',
+    pres:     'heatmap_pres_diff_ci.png',
+    rhum:     'heatmap_rhum_diff_ci.png',
+    wspd_mph: 'heatmap_wspd_mph_diff_ci.png',
   };
 
   const result = {};
   for (const variable of variables) {
-    const path = `analysis/cleaned_analysis/${folder}/${fileNames[variable]}`;
+    const path = `analysis/cleaned_analysis_diff_ci/${folder}/${fileNames[variable]}`;
     try {
       const res = await fetch(
         `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
@@ -394,24 +396,50 @@ async function fetchHeatmapImages(abbr) {
   return result;
 }
 
+async function getPhotoDir(pat) {
+  if (PHOTO_DIR_CACHE !== null) return PHOTO_DIR_CACHE;
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/Stadium%20Photos`,
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    PHOTO_DIR_CACHE = res.ok ? await res.json() : [];
+    console.log('[ParkCast] Stadium Photos dir:', PHOTO_DIR_CACHE.map(f => `${f.name} (${(f.size/1024).toFixed(0)} KB)`));
+  } catch (e) {
+    PHOTO_DIR_CACHE = [];
+    console.warn('[ParkCast] Could not list Stadium Photos:', e);
+  }
+  return PHOTO_DIR_CACHE;
+}
+
 async function fetchStadiumPhoto(abbr) {
   if (PHOTO_CACHE[abbr] !== undefined) return PHOTO_CACHE[abbr];
   const pat = getPAT();
   if (!pat) { PHOTO_CACHE[abbr] = null; return null; }
 
-  // Filename uses the same abbr as in the repo: e.g. SF.jpeg, AZ.jpeg, ATH.jpeg
-  // Map dashboard abbr back to the filename abbr used in Stadium Photos folder
-  const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' }; // reverse of CSV_ABBR_FIX
+  // Map dashboard abbr → filename prefix used in Stadium Photos folder
+  const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' };
   const fileAbbr = PHOTO_ABBR[abbr] || abbr;
 
+  // List directory once so we find the file regardless of extension or case
+  const dir = await getPhotoDir(pat);
+  const match = dir.find(f =>
+    f.type === 'file' &&
+    f.name.toLowerCase().startsWith(fileAbbr.toLowerCase() + '.') &&
+    /\.(jpe?g|png|webp)$/i.test(f.name)
+  );
+
+  console.log(`[ParkCast] Photo lookup: abbr=${abbr} fileAbbr=${fileAbbr} match=${match?.name ?? 'none'}`);
+  if (!match) { PHOTO_CACHE[abbr] = null; return null; }
+
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/Stadium%20Photos/${fileAbbr}.jpeg`,
+    const res = await fetch(match.git_url,
       { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
     if (!res.ok) { PHOTO_CACHE[abbr] = null; return null; }
     const json = await res.json();
-    PHOTO_CACHE[abbr] = `data:image/jpeg;base64,${json.content.replace(/\n/g, '')}`;
+    const mime = /\.png$/i.test(match.name) ? 'image/png' : 'image/jpeg';
+    PHOTO_CACHE[abbr] = `data:${mime};base64,${json.content.replace(/\n/g, '')}`;
     return PHOTO_CACHE[abbr];
   } catch (e) {
     PHOTO_CACHE[abbr] = null;
