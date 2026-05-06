@@ -32,14 +32,77 @@ Usage:
     # Generate visualizations
     fig_waterfall = explainer.plot_waterfall(result)
     fig_bars = explainer.plot_contributions(result)
+
+    # For web dashboard (JSON-serializable output)
+    dashboard_result = explainer.explain_for_dashboard(
+        park='SF',
+        temp_f=85,
+        humidity=45,
+        wind_speed=12,
+        wind_direction_cf=0.8,
+        is_night=False,
+        target='strikeouts',
+        baseline_type='league'
+    )
 """
 
 import json
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import warnings
+
+
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Dome parks with their roof types
+DOME_PARKS = {
+    'ARI': {'name': 'Chase Field', 'type': 'retractable'},
+    'HOU': {'name': 'Minute Maid Park', 'type': 'retractable'},
+    'MIA': {'name': 'loanDepot Park', 'type': 'retractable'},
+    'MIL': {'name': 'American Family Field', 'type': 'retractable'},
+    'SEA': {'name': 'T-Mobile Park', 'type': 'retractable'},
+    'TB': {'name': 'Tropicana Field', 'type': 'fixed'},
+    'TEX': {'name': 'Globe Life Field', 'type': 'retractable'},
+    'TOR': {'name': 'Rogers Centre', 'type': 'retractable'},
+}
+
+# Park names for all MLB stadiums
+PARK_NAMES = {
+    'ARI': 'Chase Field',
+    'ATL': 'Truist Park',
+    'BAL': 'Camden Yards',
+    'BOS': 'Fenway Park',
+    'CHC': 'Wrigley Field',
+    'CIN': 'Great American Ball Park',
+    'CLE': 'Progressive Field',
+    'COL': 'Coors Field',
+    'CWS': 'Guaranteed Rate Field',
+    'DET': 'Comerica Park',
+    'HOU': 'Minute Maid Park',
+    'KC': 'Kauffman Stadium',
+    'LAA': 'Angel Stadium',
+    'LAD': 'Dodger Stadium',
+    'MIA': 'loanDepot Park',
+    'MIL': 'American Family Field',
+    'MIN': 'Target Field',
+    'NYM': 'Citi Field',
+    'NYY': 'Yankee Stadium',
+    'OAK': 'Oakland Coliseum',
+    'PHI': 'Citizens Bank Park',
+    'PIT': 'PNC Park',
+    'SD': 'Petco Park',
+    'SEA': 'T-Mobile Park',
+    'SF': 'Oracle Park',
+    'STL': 'Busch Stadium',
+    'TB': 'Tropicana Field',
+    'TEX': 'Globe Life Field',
+    'TOR': 'Rogers Centre',
+    'WSH': 'Nationals Park',
+}
 
 
 @dataclass
@@ -71,6 +134,53 @@ class FeatureContribution:
             self.display_name = feature_info.get(self.feature, (self.feature, ''))[0]
         if not self.unit:
             self.unit = feature_info.get(self.feature, ('', ''))[1]
+
+
+@dataclass
+class WaterfallBar:
+    """Single bar in a waterfall chart."""
+    id: str
+    label: str
+    start: float
+    end: float
+    bar_type: str  # 'baseline', 'positive', 'negative', 'total'
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            'id': self.id,
+            'label': self.label,
+            'start': round(self.start, 3),
+            'end': round(self.end, 3),
+            'type': self.bar_type,
+        }
+
+
+@dataclass
+class DashboardFactor:
+    """Factor contribution for dashboard display."""
+    id: str
+    label: str
+    description: str
+    contribution: float
+    direction: str  # 'positive', 'negative', 'neutral'
+    raw_value: Optional[float] = None
+    deviation: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serializable dictionary."""
+        result = {
+            'id': self.id,
+            'label': self.label,
+            'description': self.description,
+            'contribution': round(self.contribution, 3),
+            'direction': self.direction,
+        }
+        if self.raw_value is not None:
+            result['raw_value'] = round(self.raw_value, 1)
+        if self.deviation is not None:
+            result['deviation'] = round(self.deviation, 1)
+        return result
 
 
 @dataclass
@@ -896,6 +1006,573 @@ class PredictionExplainer:
         plt.tight_layout()
         return fig
 
+    # =========================================================================
+    # DASHBOARD API METHODS
+    # =========================================================================
+
+    def is_dome_park(self, park: str) -> bool:
+        """Check if park has a dome/retractable roof."""
+        return park in DOME_PARKS
+
+    def get_park_name(self, park: str) -> str:
+        """Get full stadium name for a park code."""
+        return PARK_NAMES.get(park, park)
+
+    def _calculate_combined_wind(
+        self,
+        wspd_mph: float,
+        wind_cf: float,
+        target: str,
+        park: str,
+        baseline_type: str = 'league'
+    ) -> DashboardFactor:
+        """
+        Combine wind speed and direction into a single wind factor.
+
+        Parameters
+        ----------
+        wspd_mph : float
+            Wind speed in mph
+        wind_cf : float
+            Wind component toward center field (positive = blowing out)
+        target : str
+            'strikeouts' or 'runs'
+        park : str
+            Park code
+        baseline_type : str
+            'league' or 'park'
+
+        Returns
+        -------
+        DashboardFactor
+            Combined wind factor with description
+        """
+        fe = self.params[target]['fixed_effects']
+
+        # Get baseline values
+        wspd_baseline = self._get_baseline_value('wspd_mph', baseline_type, park)
+        wind_cf_baseline = self._get_baseline_value('wind_cf', baseline_type, park)
+
+        # Standardize values
+        wspd_std = self._standardize_value('wspd_mph', wspd_mph)
+        wspd_baseline_std = self._standardize_value('wspd_mph', wspd_baseline)
+
+        wind_cf_std = self._standardize_value('wind_cf', wind_cf)
+        wind_cf_baseline_std = self._standardize_value('wind_cf', wind_cf_baseline)
+
+        # Calculate contributions using fixed effects only (matches predict())
+        wspd_contrib = fe['wspd_mph'] * (wspd_std - wspd_baseline_std)
+        wind_cf_contrib = fe['wind_cf'] * (wind_cf_std - wind_cf_baseline_std)
+
+        total_contrib = wspd_contrib + wind_cf_contrib
+
+        # Generate description
+        if wind_cf > 0:
+            direction_desc = "blowing out"
+        elif wind_cf < 0:
+            direction_desc = "blowing in"
+        else:
+            direction_desc = "crosswind"
+
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+        direction = 'positive' if total_contrib > 0.01 else ('negative' if total_contrib < -0.01 else 'neutral')
+
+        return DashboardFactor(
+            id='wind',
+            label='Wind',
+            description=f"Wind ({wspd_mph:.0f} mph, {direction_desc}) contributes {total_contrib:+.2f} {target_unit}",
+            contribution=total_contrib,
+            direction=direction,
+            raw_value=wspd_mph,
+        )
+
+    def _calculate_temperature_factor(
+        self,
+        temp_f: float,
+        target: str,
+        park: str,
+        baseline_type: str = 'league'
+    ) -> DashboardFactor:
+        """Calculate temperature factor."""
+        fe = self.params[target]['fixed_effects']
+
+        # Get baseline
+        temp_baseline = self._get_baseline_value('temp_f', baseline_type, park)
+
+        # Standardize
+        temp_std = self._standardize_value('temp_f', temp_f)
+        temp_baseline_std = self._standardize_value('temp_f', temp_baseline)
+
+        # Calculate contribution using fixed effects only (matches predict())
+        contribution = fe['temp_f'] * (temp_std - temp_baseline_std)
+
+        deviation = temp_f - temp_baseline
+        direction = 'positive' if contribution > 0.01 else ('negative' if contribution < -0.01 else 'neutral')
+
+        sign = '+' if deviation >= 0 else ''
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        return DashboardFactor(
+            id='temperature',
+            label='Temperature',
+            description=f"Temperature ({temp_f:.0f}°F, {sign}{deviation:.0f}° vs avg) contributes {contribution:+.2f} {target_unit}",
+            contribution=contribution,
+            direction=direction,
+            raw_value=temp_f,
+            deviation=deviation,
+        )
+
+    def _calculate_humidity_factor(
+        self,
+        humidity: float,
+        target: str,
+        park: str,
+        baseline_type: str = 'league'
+    ) -> DashboardFactor:
+        """Calculate humidity factor."""
+        fe = self.params[target]['fixed_effects']
+
+        # Get baseline
+        rhum_baseline = self._get_baseline_value('rhum', baseline_type, park)
+
+        # Standardize
+        rhum_std = self._standardize_value('rhum', humidity)
+        rhum_baseline_std = self._standardize_value('rhum', rhum_baseline)
+
+        # Calculate contribution (humidity has no park interaction in current model)
+        contribution = fe['rhum'] * (rhum_std - rhum_baseline_std)
+
+        deviation = humidity - rhum_baseline
+        direction = 'positive' if contribution > 0.01 else ('negative' if contribution < -0.01 else 'neutral')
+
+        sign = '+' if deviation >= 0 else ''
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        return DashboardFactor(
+            id='humidity',
+            label='Humidity',
+            description=f"Humidity ({humidity:.0f}%, {sign}{deviation:.0f}% vs avg) contributes {contribution:+.2f} {target_unit}",
+            contribution=contribution,
+            direction=direction,
+            raw_value=humidity,
+            deviation=deviation,
+        )
+
+    def _calculate_day_night_factor(
+        self,
+        is_night: bool,
+        target: str,
+        park: str,
+        baseline_type: str = 'league'
+    ) -> DashboardFactor:
+        """Calculate day/night factor."""
+        fe = self.params[target]['fixed_effects']
+
+        # Get baseline and convert to binary (matches predict() behavior)
+        # Baseline is 1 (night) if proportion >= 0.5, else 0 (day)
+        night_baseline_raw = self._get_baseline_value('is_night', baseline_type, park)
+        night_baseline = 1 if night_baseline_raw >= 0.5 else 0
+
+        is_night_val = 1 if is_night else 0
+        contribution = fe['is_night'] * (is_night_val - night_baseline)
+
+        game_type = "Night game" if is_night else "Day game"
+        direction = 'positive' if contribution > 0.01 else ('negative' if contribution < -0.01 else 'neutral')
+
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        return DashboardFactor(
+            id='day_night',
+            label='Day/Night',
+            description=f"{game_type} contributes {contribution:+.2f} {target_unit}",
+            contribution=contribution,
+            direction=direction,
+        )
+
+    def _calculate_park_factor(
+        self,
+        park: str,
+        target: str
+    ) -> DashboardFactor:
+        """Calculate combined park effect (fixed effect only, not weather interactions)."""
+        park_effect = self.params[target]['park_effects'].get(park, 0.0)
+
+        direction = 'positive' if park_effect > 0.01 else ('negative' if park_effect < -0.01 else 'neutral')
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        return DashboardFactor(
+            id='park',
+            label=f'{park} Park',
+            description=f"{self.get_park_name(park)} contributes {park_effect:+.2f} {target_unit}",
+            contribution=park_effect,
+            direction=direction,
+        )
+
+    def _calculate_air_density_factor(
+        self,
+        temp_f: float,
+        humidity: float,
+        target: str,
+        park: str,
+        baseline_type: str = 'league'
+    ) -> DashboardFactor:
+        """Calculate air density factor."""
+        fe = self.params[target]['fixed_effects']
+
+        # Compute actual air density
+        air_density = self._compute_air_density(temp_f, humidity)
+
+        # Compute baseline air density from baseline temp and humidity
+        # (matches how predict() calculates the baseline)
+        baseline_temp = self._get_baseline_value('temp_f', baseline_type, park)
+        baseline_humidity = self._get_baseline_value('rhum', baseline_type, park)
+        density_baseline = self._compute_air_density(baseline_temp, baseline_humidity)
+
+        # Standardize
+        density_std = self._standardize_value('air_density', air_density)
+        density_baseline_std = self._standardize_value('air_density', density_baseline)
+
+        # Calculate contribution
+        contribution = fe['air_density'] * (density_std - density_baseline_std)
+
+        deviation = air_density - density_baseline
+        direction = 'positive' if contribution > 0.01 else ('negative' if contribution < -0.01 else 'neutral')
+
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        return DashboardFactor(
+            id='air_density',
+            label='Air Density',
+            description=f"Air density ({air_density:.3f} kg/m³) contributes {contribution:+.2f} {target_unit}",
+            contribution=contribution,
+            direction=direction,
+            raw_value=air_density,
+            deviation=deviation,
+        )
+
+    def _build_waterfall_data(
+        self,
+        baseline: float,
+        factors: List[DashboardFactor],
+        prediction: float,
+        baseline_label: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Build waterfall chart data structure.
+
+        Parameters
+        ----------
+        baseline : float
+            Starting baseline value
+        factors : List[DashboardFactor]
+            List of factors with contributions
+        prediction : float
+            Final prediction value
+        baseline_label : str
+            Label for baseline bar
+
+        Returns
+        -------
+        List[Dict]
+            List of bar data dictionaries
+        """
+        bars = []
+
+        # Baseline bar
+        bars.append(WaterfallBar(
+            id='baseline',
+            label=baseline_label,
+            start=0,
+            end=baseline,
+            bar_type='baseline'
+        ))
+
+        # Factor bars
+        current = baseline
+        for factor in factors:
+            if abs(factor.contribution) > 0.001:  # Skip negligible contributions
+                bar_type = 'positive' if factor.contribution > 0 else 'negative'
+                bars.append(WaterfallBar(
+                    id=factor.id,
+                    label=factor.label,
+                    start=current,
+                    end=current + factor.contribution,
+                    bar_type=bar_type
+                ))
+                current += factor.contribution
+
+        # Total bar
+        bars.append(WaterfallBar(
+            id='total',
+            label='Prediction',
+            start=0,
+            end=prediction,
+            bar_type='total'
+        ))
+
+        return [bar.to_dict() for bar in bars]
+
+    def _generate_disclaimer(self, target: str) -> Dict[str, Any]:
+        """
+        Generate disclaimer with model R² and caveats.
+
+        Parameters
+        ----------
+        target : str
+            'strikeouts' or 'runs'
+
+        Returns
+        -------
+        Dict
+            Disclaimer data
+        """
+        r2 = self.params[target].get('model_r2', {}).get('marginal', 0)
+        target_name = 'strikeout' if target == 'strikeouts' else 'run'
+
+        return {
+            'text': f"Weather explains approximately {r2*100:.0f}% of {target_name} variance. Team quality and pitcher matchups have larger effects.",
+            'r_squared': round(r2, 3),
+            'note': "Predictions are statistical estimates, not guarantees."
+        }
+
+    def _generate_summary(
+        self,
+        prediction: float,
+        baseline: float,
+        factors: List[DashboardFactor],
+        target: str,
+        is_dome: bool,
+        dome_closed: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate summary headline and key drivers.
+
+        Parameters
+        ----------
+        prediction : float
+            Final prediction
+        baseline : float
+            Baseline value
+        factors : List[DashboardFactor]
+            Contributing factors
+        target : str
+            'strikeouts' or 'runs'
+        is_dome : bool
+            Whether this is a dome park
+        dome_closed : bool
+            Whether dome is closed (weather zeroed)
+
+        Returns
+        -------
+        Dict
+            Summary with headline and key_drivers
+        """
+        delta = prediction - baseline
+        target_unit = 'strikeouts' if target == 'strikeouts' else 'runs'
+        target_short = 'K' if target == 'strikeouts' else 'R'
+
+        # Generate headline
+        if abs(delta) < 0.1:
+            headline = f"Expect roughly average {target_unit} ({prediction:.1f} {target_short})"
+        elif delta > 0:
+            headline = f"Expect +{delta:.1f} more {target_unit} than baseline ({prediction:.1f} {target_short})"
+        else:
+            headline = f"Expect {delta:.1f} fewer {target_unit} than baseline ({prediction:.1f} {target_short})"
+
+        # Generate key drivers
+        key_drivers = []
+
+        if is_dome and dome_closed:
+            key_drivers.append("Dome closed - weather effects neutralized")
+        else:
+            # Sort factors by absolute contribution
+            sorted_factors = sorted(
+                [f for f in factors if f.id not in ['park']],
+                key=lambda x: abs(x.contribution),
+                reverse=True
+            )
+
+            for factor in sorted_factors[:3]:
+                if abs(factor.contribution) > 0.05:
+                    effect = "increases" if factor.contribution > 0 else "decreases"
+                    key_drivers.append(f"{factor.label} {effect} {target_unit} by {abs(factor.contribution):.2f}")
+
+        # Add park effect if significant
+        park_factor = next((f for f in factors if f.id == 'park'), None)
+        if park_factor and abs(park_factor.contribution) > 0.1:
+            effect = "favors more" if park_factor.contribution > 0 else "suppresses"
+            key_drivers.append(f"Park historically {effect} {target_unit}")
+
+        return {
+            'headline': headline,
+            'key_drivers': key_drivers if key_drivers else ["Weather conditions near league average"]
+        }
+
+    def explain_for_dashboard(
+        self,
+        park: str,
+        temp_f: float,
+        humidity: float,
+        wind_speed: float,
+        wind_direction_cf: float,
+        is_night: bool,
+        target: str = 'strikeouts',
+        baseline_type: str = 'league',
+        dome_closed: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate JSON-serializable explanation for web dashboard.
+
+        Parameters
+        ----------
+        park : str
+            Park/team code (e.g., 'SF', 'COL')
+        temp_f : float
+            Temperature in Fahrenheit
+        humidity : float
+            Relative humidity percentage
+        wind_speed : float
+            Wind speed in mph
+        wind_direction_cf : float
+            Wind component toward center field (positive = blowing out)
+        is_night : bool
+            Whether it's a night game
+        target : str
+            'strikeouts' or 'runs'
+        baseline_type : str
+            'league' for league-wide baseline, 'park' for park-specific
+        dome_closed : bool
+            For dome parks, whether the roof is closed (True zeros weather effects)
+
+        Returns
+        -------
+        Dict
+            JSON-serializable dashboard response
+        """
+        if target not in self.params:
+            raise ValueError(f"Unknown target: {target}. Use 'strikeouts' or 'runs'.")
+
+        valid_parks = list(self.params[target]['park_effects'].keys())
+        if park not in valid_parks:
+            raise ValueError(f"Unknown park: {park}. Valid parks: {valid_parks}")
+
+        is_dome = self.is_dome_park(park)
+
+        # Determine if we should zero out weather effects
+        zero_weather = is_dome and dome_closed
+
+        # Get baseline prediction
+        baseline_weather = {
+            'temp_f': self._get_baseline_value('temp_f', baseline_type, park),
+            'rhum': self._get_baseline_value('rhum', baseline_type, park),
+            'wspd_mph': self._get_baseline_value('wspd_mph', baseline_type, park),
+            'wind_cf': self._get_baseline_value('wind_cf', baseline_type, park),
+            'is_night': self._get_baseline_value('is_night', baseline_type, park) >= 0.5,
+        }
+        baseline_pred, _, _ = self.predict(park, baseline_weather, target)
+
+        # Get actual prediction
+        weather = {
+            'temp_f': temp_f,
+            'rhum': humidity,
+            'wspd_mph': wind_speed,
+            'wind_cf': wind_direction_cf,
+            'is_night': is_night,
+        }
+        prediction, _, _ = self.predict(park, weather, target)
+
+        # Calculate individual factors
+        factors = []
+
+        # Temperature
+        temp_factor = self._calculate_temperature_factor(temp_f, target, park, baseline_type)
+        if zero_weather:
+            temp_factor.contribution = 0.0
+            temp_factor.direction = 'neutral'
+            temp_factor.description = f"Temperature ({temp_f:.0f}°F) - dome closed, no effect"
+        factors.append(temp_factor)
+
+        # Humidity
+        humidity_factor = self._calculate_humidity_factor(humidity, target, park, baseline_type)
+        if zero_weather:
+            humidity_factor.contribution = 0.0
+            humidity_factor.direction = 'neutral'
+            humidity_factor.description = f"Humidity ({humidity:.0f}%) - dome closed, no effect"
+        factors.append(humidity_factor)
+
+        # Wind (combined)
+        wind_factor = self._calculate_combined_wind(wind_speed, wind_direction_cf, target, park, baseline_type)
+        if zero_weather:
+            wind_factor.contribution = 0.0
+            wind_factor.direction = 'neutral'
+            wind_factor.description = f"Wind ({wind_speed:.0f} mph) - dome closed, no effect"
+        factors.append(wind_factor)
+
+        # Air density
+        air_density_factor = self._calculate_air_density_factor(temp_f, humidity, target, park, baseline_type)
+        if zero_weather:
+            air_density_factor.contribution = 0.0
+            air_density_factor.direction = 'neutral'
+            air_density_factor.description = "Air density - dome closed, no effect"
+        factors.append(air_density_factor)
+
+        # Day/Night
+        day_night_factor = self._calculate_day_night_factor(is_night, target, park, baseline_type)
+        factors.append(day_night_factor)
+
+        # Park effect
+        park_factor = self._calculate_park_factor(park, target)
+        factors.append(park_factor)
+
+        # If dome is closed, adjust prediction to remove weather effects
+        if zero_weather:
+            # Recalculate with baseline weather but keeping day/night and park
+            adjusted_weather = baseline_weather.copy()
+            adjusted_weather['is_night'] = is_night
+            prediction, _, _ = self.predict(park, adjusted_weather, target)
+
+        # Build response
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        response = {
+            'meta': {
+                'version': '3.0.0',
+                'target': target,
+                'park': park,
+                'park_name': self.get_park_name(park),
+                'is_dome': is_dome,
+                'dome_closed': dome_closed if is_dome else None,
+                'baseline_type': baseline_type,
+            },
+            'prediction': {
+                'value': round(prediction, 2),
+                'baseline': round(baseline_pred, 2),
+                'delta': round(prediction - baseline_pred, 2),
+                'unit': target_unit,
+            },
+            'factors': [f.to_dict() for f in factors],
+            'waterfall': {
+                # Exclude park factor from waterfall - it's already in the baseline prediction
+                'bars': self._build_waterfall_data(
+                    baseline=baseline_pred,
+                    factors=[f for f in factors if f.id != 'park'],
+                    prediction=prediction,
+                    baseline_label=f"{baseline_type.title()} Baseline"
+                )
+            },
+            'summary': self._generate_summary(
+                prediction=prediction,
+                baseline=baseline_pred,
+                factors=factors,
+                target=target,
+                is_dome=is_dome,
+                dome_closed=dome_closed
+            ),
+            'disclaimer': self._generate_disclaimer(target),
+        }
+
+        return response
+
 
 def main():
     """Demo the explainer functionality."""
@@ -959,8 +1636,74 @@ def main():
     print(f"Prediction: {result3.prediction:.1f} runs")
     print(f"Net effect: {result3.prediction - result3.baseline_prediction:+.2f} runs")
 
+    # Example 4: Dashboard API demo
+    print("\n\n[4] DASHBOARD API (JSON OUTPUT)")
+    print("-" * 40)
+
+    dashboard_result = explainer.explain_for_dashboard(
+        park='SF',
+        temp_f=85,
+        humidity=45,
+        wind_speed=12,
+        wind_direction_cf=0.8,
+        is_night=False,
+        target='strikeouts',
+        baseline_type='league'
+    )
+
+    print(json.dumps(dashboard_result, indent=2))
+
+    # Example 5: Dome park with roof closed
+    print("\n\n[5] DOME PARK - TROPICANA FIELD (ROOF CLOSED)")
+    print("-" * 40)
+
+    dome_result = explainer.explain_for_dashboard(
+        park='TB',
+        temp_f=95,
+        humidity=80,
+        wind_speed=15,
+        wind_direction_cf=10,
+        is_night=True,
+        target='strikeouts',
+        baseline_type='league',
+        dome_closed=True
+    )
+
+    print(f"Park: {dome_result['meta']['park_name']}")
+    print(f"Is Dome: {dome_result['meta']['is_dome']}")
+    print(f"Dome Closed: {dome_result['meta']['dome_closed']}")
+    print(f"Prediction: {dome_result['prediction']['value']} K")
+    print(f"Summary: {dome_result['summary']['headline']}")
+    print("Key Drivers:")
+    for driver in dome_result['summary']['key_drivers']:
+        print(f"  - {driver}")
+
+    # Example 6: Dome park with roof open
+    print("\n\n[6] DOME PARK - MINUTE MAID PARK (ROOF OPEN)")
+    print("-" * 40)
+
+    dome_open_result = explainer.explain_for_dashboard(
+        park='HOU',
+        temp_f=88,
+        humidity=70,
+        wind_speed=8,
+        wind_direction_cf=5,
+        is_night=True,
+        target='runs',
+        baseline_type='league',
+        dome_closed=False
+    )
+
+    print(f"Park: {dome_open_result['meta']['park_name']}")
+    print(f"Is Dome: {dome_open_result['meta']['is_dome']}")
+    print(f"Dome Closed: {dome_open_result['meta']['dome_closed']}")
+    print(f"Prediction: {dome_open_result['prediction']['value']} R")
+    print("\nFactors:")
+    for factor in dome_open_result['factors']:
+        print(f"  {factor['label']}: {factor['contribution']:+.3f} ({factor['direction']})")
+
     # Test visualization if matplotlib is available
-    print("\n\n[4] GENERATING VISUALIZATIONS")
+    print("\n\n[7] GENERATING VISUALIZATIONS")
     print("-" * 40)
     try:
         import matplotlib
