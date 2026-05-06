@@ -1312,7 +1312,8 @@ def prepare_park_weather_interactions(
     scaler_type: str = 'robust',
     split_method: str = 'season',
     test_size: float = 0.30,
-    random_state: int = 42
+    random_state: int = 42,
+    include_roof_interactions: bool = False
 ) -> Dict[str, any]:
     """
     Prepare data for Ridge/Lasso regression with explicit park × weather interactions.
@@ -1353,6 +1354,11 @@ def prepare_park_weather_interactions(
         Proportion of data for test set (default: 0.30). Only used if split_method='random_month'.
     random_state : int
         Random seed for reproducibility (default: 42). Only used if split_method='random_month'.
+    include_roof_interactions : bool
+        Whether to include has_roof × weather interactions. When True, adds:
+        - has_roof: Binary indicator (1 if stadium has retractable/fixed roof)
+        - has_roof × temp_f, has_roof × wspd_mph, has_roof × wind_cf
+        This allows the model to learn that roofed stadiums have dampened weather effects.
 
     Returns
     -------
@@ -1434,6 +1440,29 @@ def prepare_park_weather_interactions(
     parks = sorted(df_train['home_team'].unique())
     print(f"Found {len(parks)} unique parks in training data")
 
+    # Add has_roof indicator if requested
+    roof_features = []
+    roof_interaction_features = []
+    if include_roof_interactions:
+        # Load stadium parameters to get has_roof
+        try:
+            stadium_params = load_stadium_parameters()
+            # Map has_roof to each game based on home_team
+            # Handle team code differences (AZ vs ARI, ATH vs OAK)
+            team_mapping = {'ARI': 'AZ', 'OAK': 'ATH'}
+
+            for df_split in [df_train, df_test]:
+                lookup_team = df_split['home_team'].replace(team_mapping)
+                df_split['has_roof'] = lookup_team.map(stadium_params['has_roof']).fillna(0).astype(int)
+
+            roof_features = ['has_roof']
+
+            # Create has_roof × weather interactions (will be added after scaling)
+            print(f"Added has_roof indicator. Parks with roofs: {[p for p in parks if p in ['TB', 'MIA', 'HOU', 'ARI', 'TOR', 'MIL', 'SEA', 'TEX']]}")
+        except FileNotFoundError:
+            warnings.warn("Could not load stadium parameters. has_roof feature not added.")
+            include_roof_interactions = False
+
     # Standardize weather features if requested
     weather_scaler = None
     scaling_params = {}
@@ -1482,12 +1511,21 @@ def prepare_park_weather_interactions(
             train_interactions[interaction_name] = df_train[weather_feat].values * train_park_dummies[f'park_{park}'].values
             test_interactions[interaction_name] = df_test[weather_feat].values * test_park_dummies[f'park_{park}'].values
 
+    # Create has_roof × weather interactions if requested
+    # This allows the model to learn that roofed stadiums have dampened weather effects
+    if include_roof_interactions and 'has_roof' in df_train.columns:
+        for weather_feat in weather_features:
+            interaction_name = f'has_roof_x_{weather_feat}'
+            roof_interaction_features.append(interaction_name)
+            train_interactions[interaction_name] = df_train['has_roof'].values * df_train[weather_feat].values
+            test_interactions[interaction_name] = df_test['has_roof'].values * df_test[weather_feat].values
+
     # Concatenate all new columns at once to avoid fragmentation
     df_train = pd.concat([df_train, pd.DataFrame(train_park_dummies, index=df_train.index), pd.DataFrame(train_interactions, index=df_train.index)], axis=1)
     df_test = pd.concat([df_test, pd.DataFrame(test_park_dummies, index=df_test.index), pd.DataFrame(test_interactions, index=df_test.index)], axis=1)
 
-    # Define feature columns in order: weather, is_night, park dummies, interactions
-    feature_names = weather_features + ['is_night'] + park_dummies + interaction_features
+    # Define feature columns in order: weather, is_night, has_roof (if included), park dummies, interactions, roof interactions
+    feature_names = weather_features + ['is_night'] + roof_features + park_dummies + interaction_features + roof_interaction_features
 
     # Create feature matrices
     X_train = df_train[feature_names].values
@@ -1504,7 +1542,9 @@ def prepare_park_weather_interactions(
     print(f"  Test samples: {len(df_test)}")
     print(f"  Weather features: {len(weather_features)} ({weather_features})")
     print(f"  Park dummies: {len(park_dummies)}")
-    print(f"  Interaction terms: {len(interaction_features)}")
+    print(f"  Park-weather interactions: {len(interaction_features)}")
+    if roof_interaction_features:
+        print(f"  Roof-weather interactions: {len(roof_interaction_features)} ({roof_interaction_features})")
     print(f"  Total features: {len(feature_names)}")
     print(f"  Standardized: {standardize} (scaler: {scaler_type if standardize else 'N/A'})")
 
@@ -1521,6 +1561,8 @@ def prepare_park_weather_interactions(
         'weather_features': weather_features,
         'park_dummies': park_dummies,
         'interaction_features': interaction_features,
+        'roof_features': roof_features,
+        'roof_interaction_features': roof_interaction_features,
         'weather_scaler': weather_scaler,
         'scaling_params': scaling_params,
         'scaler_type': scaler_type if standardize else None,

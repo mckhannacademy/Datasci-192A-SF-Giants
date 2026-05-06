@@ -1,0 +1,156 @@
+{
+  "_metadata": {
+    "version": "4.0.0",
+    "model_type": "park_weather_interaction_with_roof",
+    "generated_at": "2026-05-06",
+    "split_method": "random_month",
+    "train_test_split": "70/30 random month units",
+    "random_state": 42,
+    "scaler_type": "robust",
+    "features_used": [
+      "temp_f",
+      "wspd_mph",
+      "wind_cf",
+      "is_night",
+      "has_roof"
+    ],
+    "interaction_features": [
+      "temp_f",
+      "wspd_mph",
+      "wind_cf"
+    ],
+    "has_roof_description": "Binary indicator (1 = retractable/dome roof, 0 = open-air). Weather effects are dampened by roof_dampening_factor for roofed stadiums.",
+    "roof_dampening_factor": 0.05,
+    "roofed_stadiums": [
+      "ARI",
+      "HOU",
+      "MIA",
+      "MIL",
+      "SEA",
+      "TB",
+      "TEX",
+      "TOR"
+    ],
+    "performance_notes": {
+      "random_month_test_r2_strikeouts": 0.0413,
+      "random_month_test_r2_runs": 0.0217,
+      "interpretation": "Model explains ~4% of strikeout variance and ~2% of run variance from weather. Use for directional effects only (will weather increase/decrease K or R), not precise predictions."
+    }
+  },
+  "scaling": {
+    "temp_f": {
+      "center": 73.0,
+      "scale": 16.3
+    },
+    "wspd_mph": {
+      "center": 7.0,
+      "scale": 4.7
+    },
+    "wind_cf": {
+      "center": 1.89,
+      "scale": 13.95
+    }
+  },
+  "strikeouts": {
+    "model_r2": {
+      "train": 0.0448,
+      "test": 0.0413
+    },
+    "fixed_effects": {
+      "Intercept": 8.92,
+      "temp_f": -0.08,
+      "wspd_mph": 0.04,
+      "wind_cf": 0.01,
+      "is_night": -0.27
+    },
+    "fixed_effects_interpretation": {
+      "temp_f": "Per 1 SD (16.3F) increase in temp, strikeouts decrease by ~0.08. Hotter = fewer K.",
+      "wspd_mph": "Per 1 SD (4.7 mph) increase in wind speed, strikeouts increase by ~0.04.",
+      "wind_cf": "Wind blowing out to CF has minimal effect on strikeouts.",
+      "is_night": "Night games have ~0.27 fewer strikeouts than day games."
+    },
+    "park_effects": {
+      "ARI": -0.13,
+      "ATL": 0.04,
+      "BAL": -0.48,
+      "BOS": 0.24,
+      "CHC": 0.06,
+      "CIN": 0.20,
+      "CLE": 0.30,
+      "COL": -0.82,
+      "CWS": 0.05,
+      "DET": -0.61,
+      "HOU": 0.77,
+      "KC": -0.71,
+      "LAA": 0.13,
+      "LAD": 0.55,
+      "MIA": 0.05,
+      "MIL": 0.34,
+      "MIN": -0.29,
+      "NYM": 0.46,
+      "NYY": 0.49,
+      "OAK": -0.37,
+      "PHI": 0.35,
+      "PIT": -0.35,
+      "SD": 0.31,
+      "SEA": 0.11,
+      "SF": -0.06,
+      "STL": -0.46,
+      "TB": 0.46,
+      "TEX": -0.51,
+      "TOR": -0.14,
+      "WSH": 0.01
+    }
+  },
+  "runs": {
+    "model_r2": {
+      "train": 0.0267,
+      "test": 0.0217
+    },
+    "fixed_effects": {
+      "Intercept": 4.43,
+      "temp_f": 0.20,
+      "wspd_mph": 0.09,
+      "wind_cf": 0.09,
+      "is_night": 0.12
+    },
+    "fixed_effects_interpretation": {
+      "temp_f": "Per 1 SD (16.3F) increase in temp, runs increase by ~0.20. Hotter = more runs.",
+      "wspd_mph": "Per 1 SD (4.7 mph) increase in wind speed, runs increase by ~0.09.",
+      "wind_cf": "Wind blowing out to CF increases runs by ~0.09 per SD.",
+      "is_night": "Night games have ~0.12 more runs than day games."
+    },
+    "park_effects": {
+      "ARI": 0.01,
+      "ATL": 0.12,
+      "BAL": 0.29,
+      "BOS": 0.30,
+      "CHC": -0.23,
+      "CIN": 0.36,
+      "CLE": -0.29,
+      "COL": 0.83,
+      "CWS": 0.16,
+      "DET": 0.29,
+      "HOU": -0.36,
+      "KC": 0.23,
+      "LAA": 0.30,
+      "LAD": -0.64,
+      "MIA": 0.00,
+      "MIL": -0.23,
+      "MIN": 0.22,
+      "NYM": -0.32,
+      "NYY": -0.30,
+      "OAK": 0.08,
+      "PHI": -0.09,
+      "PIT": 0.16,
+      "SD": -0.19,
+      "SEA": -0.19,
+      "SF": -0.02,
+      "STL": -0.30,
+      "TB": -0.37,
+      "TEX": 0.09,
+      "TOR": 0.02,
+      "WSH": 0.07
+    }
+  }
+}
