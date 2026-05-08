@@ -115,6 +115,7 @@
   .section-divider-line { flex: 1; height: 1px; background: var(--line2); }
 
   .dist-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; min-width: 0; }
+  .dist-row.dist-row-2 { grid-template-columns: repeat(2, 1fr); }
   .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
   .dist-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text2); }
   .dist-stats { display: flex; justify-content: space-between; }
@@ -182,7 +183,7 @@
     <div class="topbar-label">MLB Weather Performance Intelligence</div>
     <div class="topbar-right">
       <div class="status-dot"></div>
-      <div class="status-label">Model v1.0 — OLS + Park FE</div>
+      <div class="status-label">Model v4.0 — OLS + Park FE</div>
       <div class="topbar-divider"></div>
       <button class="page-btn active" id="btn-page1" onclick="setPage(1)">&#9650; Projections</button>
       <button class="page-btn" id="btn-page2" onclick="setPage(2)">&#128202; Analysis</button>
@@ -214,20 +215,12 @@
           <input type="range" min="20" max="105" value="72" id="wx-temp" oninput="updateWx()">
         </div>
         <div class="wx-row">
-          <label>Humidity (%) <span id="hum-val">55</span></label>
-          <input type="range" min="0" max="100" value="55" id="wx-hum" oninput="updateWx()">
-        </div>
-        <div class="wx-row">
           <label>Wind Speed (mph) <span id="wind-val">12</span></label>
           <input type="range" min="0" max="40" value="12" id="wx-wind" oninput="updateWx()">
         </div>
         <div class="wx-row">
           <label>Wind Direction <span id="winddir-val">SW</span></label>
           <input type="range" min="0" max="315" step="45" value="225" id="wx-winddir" oninput="updateWx()">
-        </div>
-        <div class="wx-row">
-          <label>Pressure (inHg) <span id="press-val">29.92</span></label>
-          <input type="range" min="2890" max="3050" value="2992" id="wx-press" oninput="updateWx()">
         </div>
       </div>
  
@@ -466,6 +459,10 @@ function onPatInput() {
     setPatStatus('idle', 'No token — using placeholder data');
     return;
   }
+  // Clear cached results so new PAT triggers fresh fetches
+  Object.keys(HEATMAP_CACHE).forEach(k => delete HEATMAP_CACHE[k]);
+  PHOTO_DIR_CACHE = null;
+  Object.keys(PHOTO_CACHE).forEach(k => delete PHOTO_CACHE[k]);
   setPatStatus('idle', 'Token entered — click Run Projection');
 }
 
@@ -648,195 +645,105 @@ function filterStadiums(q) {
 
 function updateWx() {
   document.getElementById('temp-val').textContent    = document.getElementById('wx-temp').value;
-  document.getElementById('hum-val').textContent     = document.getElementById('wx-hum').value;
   document.getElementById('wind-val').textContent    = document.getElementById('wx-wind').value;
   const dd = +document.getElementById('wx-winddir').value;
   document.getElementById('winddir-val').textContent = DIRS[Math.round(dd/45)%8];
-  const pr = +document.getElementById('wx-press').value;
-  document.getElementById('press-val').textContent   = (pr/100).toFixed(2);
 }
 
 function getWx() {
   return {
     temp:    +document.getElementById('wx-temp').value,
-    hum:     +document.getElementById('wx-hum').value,
     wind:    +document.getElementById('wx-wind').value,
     winddir: +document.getElementById('wx-winddir').value,
-    press:   +document.getElementById('wx-press').value / 100,
     date:    document.getElementById('game-date').value,
     hour:    +document.getElementById('game-time').value,
     dayNight: dayNight,
   };
 }
 
-// ── Real OLS model parameters (from dashboard_params.json) ────────
-const MODEL_PARAMS = {
-  "scaling": {
-    "temp_f":         { "mean": 72.41848549618321,   "std": 12.12822086457309   },
-    "rhum":           { "mean": 62.5111389312977,     "std": 18.861548507676023  },
-    "wspd_mph":       { "mean": 7.629282442748091,    "std": 3.798242334109692   },
-    "wind_cf":        { "mean": 1.8623719083969463,   "std": 9.754067652965643   },
-    "wind_lcf":       { "mean": 1.6524635114503814,   "std": 9.822541663340395   },
-    "wind_rcf":       { "mean": 1.8476555725190837,   "std": 9.61576567742797    },
-    "air_density":    { "mean": 1.1667085178334482,   "std": 0.047255215962392155 },
-    "wind_out_impact":{ "mean": 20.987092641221373,   "std": 122.28493735757027  }
+// ── Model v4.0 parameters (Andrew, RobustScaler, 3-feature OLS + Park FE) ────
+const MODEL = {
+  scaling: {
+    temp_f:   { center: 73.0,  scale: 16.3  },
+    wspd_mph: { center: 7.0,   scale: 4.7   },
+    wind_cf:  { center: 1.89,  scale: 13.95 },
   },
-  "strikeouts": {
-    "fixed_effects": {
-      "Intercept": 8.888896295276977,
-      "temp_f": 0.2696585777756224, "rhum": -0.08968239326141088,
-      "wspd_mph": 0.03577571012339667, "wind_cf": 45.47563451953789,
-      "wind_lcf": -24.375785144479117, "wind_rcf": -23.853691055570646,
-      "air_density": 0.5734657782110245, "wind_out_impact": -0.028804665045429306,
-      "is_night": -0.19745377376672502
-    },
-    "park_effects": {
-      "ARI":0.004382097227042104,"ATL":0.20715535198908178,"BAL":-0.9667832052106621,
-      "BOS":0.21144785214858997,"CHC":0.15750318292220894,"CIN":0.3619704726113104,
-      "CLE":0.576070699534671,"COL":0.809058590475893,"CWS":-0.0018780429598953632,
-      "DET":-0.9512683385846885,"HOU":1.123488730524633,"KC":-0.8134424067285869,
-      "LAA":0.16777305439648613,"LAD":0.7373336398566438,"MIA":-0.07624463320803655,
-      "MIL":0.4234680014557787,"MIN":-0.373404413604506,"NYM":0.5806528029929701,
-      "NYY":0.49144805787341334,"OAK":-0.8428855023831565,"PHI":0.07253559993753873,
-      "PIT":-0.3196633209881018,"SD":0.04697684825920279,"SEA":-0.4798581622605145,
-      "SF":0.047252009018691185,"STL":-0.5640843049782184,"TB":0.4699604831084343,
-      "TEX":-0.7835055798115398,"TOR":-0.333434624412334,"WSH":0.017975060797102867
+  roofed: ['ARI','HOU','MIA','MIL','SEA','TB','TEX','TOR'],
+  roof_dampening: 0.05,
+  strikeouts: {
+    intercept: 8.92,
+    temp_f: -0.08, wspd_mph: 0.04, wind_cf: 0.01, is_night: -0.27,
+    park: {
+      ARI:-0.13, ATL:0.04,  BAL:-0.48, BOS:0.24,  CHC:0.06,  CIN:0.20,
+      CLE:0.30,  COL:-0.82, CWS:0.05,  DET:-0.61, HOU:0.77,  KC:-0.71,
+      LAA:0.13,  LAD:0.55,  MIA:0.05,  MIL:0.34,  MIN:-0.29, NYM:0.46,
+      NYY:0.49,  OAK:-0.37, PHI:0.35,  PIT:-0.35, SD:0.31,   SEA:0.11,
+      SF:-0.06,  STL:-0.46, TB:0.46,   TEX:-0.51, TOR:-0.14, WSH:0.01,
     }
   },
-  "runs": {
-    "fixed_effects": {
-      "Intercept": 4.336987627038021,
-      "temp_f": -0.07695015195389324, "rhum": -0.10589869092740863,
-      "wspd_mph": 0.04276164485029857, "wind_cf": 3.575649598904227,
-      "wind_lcf": -1.840656971155127, "wind_rcf": -1.8286818125218907,
-      "air_density": -0.40112374250963695, "wind_out_impact": -0.009736844537328489,
-      "is_night": 0.18154743063255843
-    },
-    "park_effects": {
-      "ARI":-0.27899008284926663,"ATL":-0.05787231275164207,"BAL":0.5185584691742872,
-      "BOS":0.47600499599531876,"CHC":-0.15490523992170485,"CIN":0.35280685141173196,
-      "CLE":-0.18707710401369346,"COL":-0.23889376278100652,"CWS":0.1938769149951812,
-      "DET":0.31018058553460426,"HOU":-0.4934848446252671,"KC":0.21100694228488984,
-      "LAA":0.21264661009755606,"LAD":-0.8923096538002735,"MIA":-0.049817897813860174,
-      "MIL":0.018204305506355798,"MIN":0.10394760534699078,"NYM":-0.18392430451876923,
-      "NYY":-0.13149750069256788,"OAK":-0.04360174280022353,"PHI":0.23920693032578705,
-      "PIT":0.09085963889427148,"SD":0.08563354748197967,"SEA":0.1833385590047979,
-      "SF":-0.1261639681639946,"STL":-0.4454371438207575,"TB":-0.4659264296626431,
-      "TEX":0.38523665536790547,"TOR":0.241853826066096,"WSH":0.12653955072791245
+  runs: {
+    intercept: 4.43,
+    temp_f: 0.20, wspd_mph: 0.09, wind_cf: 0.09, is_night: 0.12,
+    park: {
+      ARI:0.01,  ATL:0.12,  BAL:0.29,  BOS:0.30,  CHC:-0.23, CIN:0.36,
+      CLE:-0.29, COL:0.83,  CWS:0.16,  DET:0.29,  HOU:-0.36, KC:0.23,
+      LAA:0.30,  LAD:-0.64, MIA:0.00,  MIL:-0.23, MIN:0.22,  NYM:-0.32,
+      NYY:-0.30, OAK:0.08,  PHI:-0.09, PIT:0.16,  SD:-0.19,  SEA:-0.19,
+      SF:-0.02,  STL:-0.30, TB:-0.37,  TEX:0.09,  TOR:0.02,  WSH:0.07,
     }
   }
 };
 
-// Compute air density from temp (°F), relative humidity (%), and pressure (hPa)
-function computeAirDensity(tempF, rhum, presHpa = 1013.25) {
-  const tempK = (tempF - 32) * 5/9 + 273.15;
-  const tempC = (tempF - 32) * 5/9;
-  const eSat  = 6.1078 * Math.pow(10, (7.5 * tempC) / (tempC + 237.3));
-  const e     = (rhum / 100) * eSat;
-  const pD    = (presHpa - e) * 100;
-  return pD / (287.05 * tempK) + (e * 100) / (461.5 * tempK);
-}
-
-// Decompose wind speed + direction into CF, LCF, RCF components
-// stadiumOrientation = compass bearing of CF from home plate
-function computeWindComponents(wspdMph, windDirDeg, stadiumOrientation) {
-  // Angle of wind arrival relative to outfield orientation
-  // windDirDeg is the direction the wind is blowing FROM (meteorological)
-  // We want the component blowing toward CF (outward from home plate)
-  const relDeg  = ((windDirDeg - stadiumOrientation) + 360) % 360;
-  const relRad  = relDeg * Math.PI / 180;
-  // CF component: positive = blowing out toward CF
-  const wind_cf  = wspdMph * Math.cos(relRad);
-  // LCF component: positive = blowing toward left-center
-  const wind_lcf = wspdMph * Math.cos((relDeg - 30) * Math.PI / 180);
-  // RCF component: positive = blowing toward right-center
-  const wind_rcf = wspdMph * Math.cos((relDeg + 30) * Math.PI / 180);
-  return { wind_cf, wind_lcf, wind_rcf };
-}
-
 function computeProjection(wx, stadium) {
-  const isNight = wx.dayNight === 'night' ? 1 : 0;
-  // Convert slider pressure from inHg to hPa (1 inHg = 33.8639 hPa)
-  const presHpa = wx.press * 33.8639;
+  const isNight  = wx.dayNight === 'night' ? 1 : 0;
+  const isRoofed = MODEL.roofed.includes(stadium.abbr);
+  const d        = isRoofed ? MODEL.roof_dampening : 1.0;
 
-  const airDensity  = computeAirDensity(wx.temp, wx.hum, presHpa);
-  const windComps   = computeWindComponents(wx.wind, wx.winddir, stadium.orientation);
-  const windOutImpact = wx.wind * windComps.wind_cf;
+  // Wind CF component: positive = blowing out toward CF
+  const relDeg  = ((wx.winddir - stadium.orientation) + 360) % 360;
+  const relRad  = relDeg * Math.PI / 180;
+  const wind_cf = wx.wind * Math.cos(relRad);
 
-  // Build raw feature map
-  const raw = {
-    temp_f:          wx.temp,
-    rhum:            wx.hum,
-    wspd_mph:        wx.wind,
-    wind_cf:         windComps.wind_cf,
-    wind_lcf:        windComps.wind_lcf,
-    wind_rcf:        windComps.wind_rcf,
-    air_density:     airDensity,
-    wind_out_impact: windOutImpact,
-  };
+  // RobustScaler: (raw - center) / scale
+  const sTemp   = (wx.temp - MODEL.scaling.temp_f.center)   / MODEL.scaling.temp_f.scale;
+  const sWind   = (wx.wind - MODEL.scaling.wspd_mph.center)  / MODEL.scaling.wspd_mph.scale;
+  const sWindCF = (wind_cf - MODEL.scaling.wind_cf.center)   / MODEL.scaling.wind_cf.scale;
 
-  // Standardize using training-set scaling params
-  const scaled = {};
-  for (const [feat, val] of Object.entries(raw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    scaled[feat] = (val - mean) / std;
-  }
+  const kC    = MODEL.strikeouts;
+  const kPark = kC.park[stadium.abbr] || 0;
+  const kPred = kC.intercept
+    + kC.temp_f   * sTemp   * d
+    + kC.wspd_mph * sWind   * d
+    + kC.wind_cf  * sWindCF * d
+    + kC.is_night * isNight
+    + kPark;
 
-  // Predict strikeouts (away team)
-  const kFE = MODEL_PARAMS.strikeouts.fixed_effects;
-  let kPred = kFE.Intercept;
-  for (const feat of Object.keys(scaled)) kPred += kFE[feat] * scaled[feat];
-  kPred += kFE.is_night * isNight;
-  kPred += MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
+  const rC    = MODEL.runs;
+  const rPark = rC.park[stadium.abbr] || 0;
+  const rPred = rC.intercept
+    + rC.temp_f   * sTemp   * d
+    + rC.wspd_mph * sWind   * d
+    + rC.wind_cf  * sWindCF * d
+    + rC.is_night * isNight
+    + rPark;
 
-  // Predict runs (away team)
-  const rFE = MODEL_PARAMS.runs.fixed_effects;
-  let rPred = rFE.Intercept;
-  for (const feat of Object.keys(scaled)) rPred += rFE[feat] * scaled[feat];
-  rPred += rFE.is_night * isNight;
-  rPred += MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
+  // Baseline at median conditions (scaled features = 0), day game, same park + dampening
+  const kBase = kC.intercept + kPark;
+  const rBase = rC.intercept + rPark;
 
-  // Baseline (neutral conditions, same park) for delta display
-  const neutralWx = { temp: 72, hum: 62, wind: 7.6, winddir: stadium.orientation, press: 29.92, dayNight: 'day' };
-  const neutralPresHpa = 1013.25;
-  const neutralAD = computeAirDensity(72, 62, 1013.25);
-  const neutralWC = computeWindComponents(7.6, stadium.orientation, stadium.orientation);
-  const neutralWOI = 7.6 * neutralWC.wind_cf;
-  const neutralRaw = { temp_f:72, rhum:62, wspd_mph:7.6,
-    wind_cf: neutralWC.wind_cf, wind_lcf: neutralWC.wind_lcf, wind_rcf: neutralWC.wind_rcf,
-    air_density: neutralAD, wind_out_impact: neutralWOI };
-  const neutralScaled = {};
-  for (const [feat, val] of Object.entries(neutralRaw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    neutralScaled[feat] = (val - mean) / std;
-  }
-  let kBase = kFE.Intercept;
-  for (const feat of Object.keys(neutralScaled)) kBase += kFE[feat] * neutralScaled[feat];
-  kBase += MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
-  let rBase = rFE.Intercept;
-  for (const feat of Object.keys(neutralScaled)) rBase += rFE[feat] * neutralScaled[feat];
-  rBase += MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
-
-  // windEffect kept for badge label and wind rose
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
-
-  // Park factor: ratio of weather-adjusted away runs vs. league-neutral baseline (4.55 runs/game),
-  // scaled so that 100 = neutral. Higher PF = more runs suppressed by conditions (pitcher-friendly).
-  // We use: PF = (rBase / rPred) × 100, so when weather inflates runs vs. baseline, PF < 100
-  // and when weather suppresses runs, PF > 100 — matching the standard run-suppression convention
-  // (park factor > 100 = hitter-friendly, < 100 = pitcher-friendly) by anchoring to rBase.
-  // Actually: standard PF > 100 = hitter-friendly (more runs). We use rPred/rBase × 100.
   const parkFactor = +((rPred / rBase) * 100).toFixed(1);
 
   return {
-    kPred:      +kPred.toFixed(2),
-    rPred:      +rPred.toFixed(2),
-    kDelta:     +(kPred - kBase).toFixed(2),
-    runsDelta:  +(rPred - rBase).toFixed(2),
-    rBase:      +rBase.toFixed(2),
+    kPred:     +kPred.toFixed(2),
+    rPred:     +rPred.toFixed(2),
+    kDelta:    +(kPred - kBase).toFixed(2),
+    runsDelta: +(rPred - rBase).toFixed(2),
+    rBase:     +rBase.toFixed(2),
     parkFactor,
-    airDensity: +airDensity.toFixed(4),
     windEffect,
+    wind_cf:   +wind_cf.toFixed(2),
+    isRoofed,
   };
 }
 
@@ -928,53 +835,43 @@ function renderMain() {
   const stadium = STADIUMS[activeStadium];
   const p = projections || computeProjection(wx, stadium);
 
-  // Air density badge — useful diagnostic
-  const adDiff = +(p.airDensity - 1.1667).toFixed(4);
-  const adLabel = adDiff > 0 ? `+${adDiff} kg/m³ (denser)` : `${adDiff} kg/m³ (thinner)`;
 
   document.getElementById('main-content').innerHTML = `
-    <!-- OUTER GRID: left content column + tall photo on right -->
+    <!-- OUTER GRID: left content + right photo -->
     <div style="display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:stretch;">
 
-      <!-- LEFT COLUMN: header info + KPI cards stacked -->
+      <!-- LEFT COLUMN -->
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="stadium-title-block">
           <div class="stadium-title">${stadium.name}</div>
           <div class="stadium-subtitle">${stadium.team} · ${stadium.city}</div>
-          ${stadium.blurb ? `<div class="stadium-blurb">${stadium.blurb}</div>` : ''}
           <div class="context-badges">
             <span class="badge badge-blue">${wx.date}</span>
-            <span class="badge badge-amber">${wx.temp}°F · ${wx.hum}% RH</span>
+            <span class="badge badge-amber">${wx.temp}°F</span>
             <span class="badge badge-wind">Wind ${wx.wind} mph ${dirLabel(wx.winddir)} · ${p.windEffect.label}</span>
-            <span class="badge badge-blue">${wx.press.toFixed(2)} inHg · ρ ${adLabel}</span>
             <span class="badge ${wx.dayNight === 'day' ? 'badge-amber' : 'badge-blue'}">${wx.dayNight === 'day' ? '☀ Day game' : '☾ Night game'}</span>
             ${stadium.roof ? '<span class="badge badge-red">RETRACTABLE ROOF — weather may not reflect playing conditions</span>' : ''}
             ${stadium.altitude ? '<span class="badge badge-amber">HIGH ALTITUDE — constant air density effect not captured in regression</span>' : ''}
           </div>
-        </div>
-
-        <div class="disclaimer">
-          <div class="disclaimer-icon">&#9432;</div>
-          <div>Projections use a <strong>mixed-effects OLS model</strong> with park fixed effects (2021–2025 game-level data). Predictions are for the <em>away team</em>. Deltas are vs. neutral baseline conditions at this park.</div>
+          ${stadium.blurb && currentPage === 2 ? `<div class="stadium-blurb">${stadium.blurb}</div>` : ''}
         </div>
 
         ${currentPage === 1 ? `
-        <div class="kpi-row">
-          <div class="kpi-card ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">
-            <div class="kpi-label">Predicted Away Runs</div>
-            <div class="kpi-value ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">${p.rPred}</div>
-            <div class="kpi-desc">Weather-adjusted · ${p.runsDelta >= 0 ? '+' : ''}${p.runsDelta} vs. park baseline</div>
+        <!-- PREDICTED PARK FACTOR (inside left column) -->
+        <div class="panel" style="flex:1;">
+          <div class="panel-header">
+            <div class="panel-title">Predicted Park Factor</div>
+            <div class="panel-tag">OLS model · Away runs ratio</div>
           </div>
-          <div class="kpi-card ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">
-            <div class="kpi-label">Predicted Away Strikeouts</div>
-            <div class="kpi-value ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">${p.kPred}</div>
-            <div class="kpi-desc">Weather-adjusted · ${p.kDelta >= 0 ? '+' : ''}${p.kDelta} vs. park baseline</div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0;flex:1;">
+            <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
+            <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= 100 ? '+' : ''}${(p.parkFactor - 100).toFixed(1)} vs. neutral (100)</div>
           </div>
         </div>
         ` : ''}
       </div>
 
-      <!-- RIGHT COLUMN: tall park photo spanning full height -->
+      <!-- RIGHT COLUMN: tall park photo -->
       <div class="park-photo-wrap" style="min-height:260px;">
         ${stadiumPhoto
           ? `<img src="${stadiumPhoto}" alt="${stadium.name}">
@@ -988,40 +885,49 @@ function renderMain() {
       </div>
     </div>
 
-    <!-- PROJECTIONS PAGE ONLY: park factor panels below the top grid -->
+    <!-- PROJECTIONS PAGE ONLY: historical chart + runs/K + histograms -->
     ${currentPage === 1 ? `
 
-    <!-- PARK FACTOR ROW -->
-    <div class="panel-row">
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Predicted Park Factor</div>
-          <div class="panel-tag">OLS model · Away runs ratio</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0">
-          <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
-          <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= 100 ? '+' : ''}${(p.parkFactor - 100).toFixed(1)} vs. neutral (100)</div>
-          <div style="font-size:11px;color:var(--text2);text-align:center;max-width:260px;line-height:1.6">
-            PF = (predicted away runs ÷ park baseline) × 100<br>
-            Baseline: <span style="font-family:var(--font-m);color:var(--text1)">${p.rBase} runs</span> · Predicted: <span style="font-family:var(--font-m);color:var(--text1)">${p.rPred} runs</span>
-          </div>
-        </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Predicted vs. Historical Park Factor</div>
+        <div class="panel-tag">${stadiumRows ? '2020–2025 · real game data' : '2021–2025 · game-level · placeholder history'}</div>
       </div>
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Predicted vs. Historical Park Factor</div>
-          <div class="panel-tag">${stadiumRows ? '2020–2025 · real game data' : '2021–2025 · game-level · placeholder history'}</div>
-        </div>
-        <div class="chart-area" style="height:160px;">
-          <canvas id="pf-chart"></canvas>
-        </div>
-        <div style="font-size:11px;color:var(--text2)">
-          Bars = historical game-level park factor (placeholder). Amber line = today's model prediction (${p.parkFactor}).
-        </div>
+      <div class="chart-area" style="height:160px;">
+        <canvas id="pf-chart"></canvas>
       </div>
     </div>
 
-    ` : ''}
+    <!-- RUNS + K ROW -->
+    <div class="kpi-row">
+      <div class="kpi-card ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">
+        <div class="kpi-label">Predicted Away Runs</div>
+        <div class="kpi-value ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">${p.rPred}</div>
+        <div class="kpi-desc">Weather-adjusted · ${p.runsDelta >= 0 ? '+' : ''}${p.runsDelta} vs. park baseline</div>
+      </div>
+      <div class="kpi-card ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">
+        <div class="kpi-label">Predicted Away Strikeouts</div>
+        <div class="kpi-value ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">${p.kPred}</div>
+        <div class="kpi-desc">Weather-adjusted · ${p.kDelta >= 0 ? '+' : ''}${p.kDelta} vs. park baseline</div>
+      </div>
+    </div>
+
+    <!-- WEATHER HISTOGRAMS -->
+    <div class="section-divider">
+      <div class="section-divider-label">Weather Distributions</div>
+      <div class="section-divider-line"></div>
+      <div class="panel-tag">Games per bucket · Historical</div>
+    </div>
+    <div class="dist-row dist-row-2">
+      <div class="dist-card">
+        <div class="dist-label">Temperature (°F)</div>
+        <div style="position:relative;height:140px"><canvas id="p1-dist-temp"></canvas></div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Wind Speed (mph)</div>
+        <div style="position:relative;height:140px"><canvas id="p1-dist-wind"></canvas></div>
+      </div>
+    </div>
 
     <!-- PAGE 1 ONLY: analogs then model inputs -->
     ${currentPage === 1 ? `
@@ -1052,6 +958,8 @@ function renderMain() {
         <tbody>${buildInputTable(wx, stadium, p)}</tbody>
       </table>
     </div>
+
+    ` : ''}
 
     ` : ''}
 
@@ -1141,6 +1049,7 @@ function renderMain() {
   if (currentPage === 1) {
     renderParkFactorChart(p);
     renderAnalogTable(wx);
+    renderPage1WeatherHists(wx);
   }
   if (currentPage === 2) {
     renderDistCharts();
@@ -1166,51 +1075,47 @@ function renderMain() {
 
 // Build the model inputs table rows for the driver breakdown panel
 function buildInputTable(wx, stadium, p) {
-  const isNight   = wx.dayNight === 'night' ? 1 : 0;
-  const presHpa   = wx.press * 33.8639;
-  const airDensity = p.airDensity;
-  const windComps  = computeWindComponents(wx.wind, wx.winddir, stadium.orientation);
-  const windOutImpact = wx.wind * windComps.wind_cf;
+  const isNight  = wx.dayNight === 'night' ? 1 : 0;
+  const isRoofed = MODEL.roofed.includes(stadium.abbr);
+  const d        = isRoofed ? MODEL.roof_dampening : 1.0;
 
-  const raw = {
-    temp_f:          wx.temp,
-    rhum:            wx.hum,
-    wspd_mph:        wx.wind,
-    wind_cf:         windComps.wind_cf,
-    wind_lcf:        windComps.wind_lcf,
-    wind_rcf:        windComps.wind_rcf,
-    air_density:     airDensity,
-    wind_out_impact: windOutImpact,
-  };
+  const relDeg  = ((wx.winddir - stadium.orientation) + 360) % 360;
+  const wind_cf = wx.wind * Math.cos(relDeg * Math.PI / 180);
 
-  const LABELS = {
-    temp_f:'Temperature (°F)', rhum:'Humidity (%)', wspd_mph:'Wind speed (mph)',
-    wind_cf:'Wind → CF', wind_lcf:'Wind → LCF', wind_rcf:'Wind → RCF',
-    air_density:'Air density (kg/m³)', wind_out_impact:'Wind out impact'
-  };
+  const features = [
+    { key: 'temp_f',   label: 'Temperature (°F)', raw: wx.temp  },
+    { key: 'wspd_mph', label: 'Wind speed (mph)',  raw: wx.wind  },
+    { key: 'wind_cf',  label: 'Wind → CF',         raw: wind_cf  },
+  ];
 
-  const rFE = MODEL_PARAMS.runs.fixed_effects;
-  const kFE = MODEL_PARAMS.strikeouts.fixed_effects;
+  const rC = MODEL.runs;
+  const kC = MODEL.strikeouts;
 
   let rows = '';
-  for (const [feat, val] of Object.entries(raw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    const z    = (val - mean) / std;
-    const rCon = rFE[feat] * z;
-    const kCon = kFE[feat] * z;
-    const rCol = rCon > 0.01 ? 'coef-pos' : rCon < -0.01 ? 'coef-neg' : '';
-    const kCol = kCon > 0.01 ? 'coef-pos' : kCon < -0.01 ? 'coef-neg' : '';
+  for (const { key, label, raw } of features) {
+    const { center, scale } = MODEL.scaling[key];
+    const z    = (raw - center) / scale;
+    const rCon = rC[key] * z * d;
+    const kCon = kC[key] * z * d;
+    const rCol = rCon > 0.001 ? 'coef-pos' : rCon < -0.001 ? 'coef-neg' : '';
+    const kCol = kCon > 0.001 ? 'coef-pos' : kCon < -0.001 ? 'coef-neg' : '';
     rows += `<tr>
-      <td style="color:var(--text1)">${LABELS[feat]}</td>
-      <td class="td-mono">${typeof val === 'number' ? val.toFixed(3) : val}</td>
+      <td style="color:var(--text1)">${label}</td>
+      <td class="td-mono">${raw.toFixed(2)}</td>
       <td class="td-mono" style="color:var(--text2)">${z.toFixed(3)}</td>
       <td class="td-mono ${rCol}">${rCon >= 0 ? '+' : ''}${rCon.toFixed(3)}</td>
       <td class="td-mono ${kCol}">${kCon >= 0 ? '+' : ''}${kCon.toFixed(3)}</td>
     </tr>`;
   }
+  // Roof dampening indicator row
+  if (isRoofed) {
+    rows += `<tr>
+      <td style="color:var(--text2);font-style:italic" colspan="5">Roof dampening applied (d = ${MODEL.roof_dampening})</td>
+    </tr>`;
+  }
   // is_night row
-  const rNight = rFE.is_night * isNight;
-  const kNight = kFE.is_night * isNight;
+  const rNight = rC.is_night * isNight;
+  const kNight = kC.is_night * isNight;
   rows += `<tr>
     <td style="color:var(--text1)">Is night game</td>
     <td class="td-mono">${isNight}</td>
@@ -1219,8 +1124,8 @@ function buildInputTable(wx, stadium, p) {
     <td class="td-mono ${kNight >= 0 ? 'coef-pos' : 'coef-neg'}">${kNight >= 0 ? '+' : ''}${kNight.toFixed(3)}</td>
   </tr>`;
   // Park effect row
-  const rPE = MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
-  const kPE = MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
+  const rPE = rC.park[stadium.abbr] || 0;
+  const kPE = kC.park[stadium.abbr] || 0;
   rows += `<tr style="border-top:1px solid var(--line2)">
     <td style="color:var(--text1)">Park effect (${stadium.abbr})</td>
     <td class="td-mono" colspan="2" style="color:var(--text2)">fixed effect</td>
@@ -1545,12 +1450,58 @@ function renderParkFactorChart(p) {
       },
       scales: {
               x: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { family: 'DM Mono', size: 11 } }, title: { display: true, text: 'Game Year', color: '#FFFFFF', font: { size: 10 } } },
-              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
+              y: { min: 70, max: 120, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
             }
           }
         });
       }
       
+function renderPage1WeatherHists(wx) {
+  const makeHist = (canvasId, labels, counts, currentBinIdx, color, xLabel, yLabel) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (canvas._chart) canvas._chart.destroy();
+    canvas._chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: counts.map((_, i) => i === currentBinIdx ? color : color + '44'),
+          borderRadius: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 },
+            title: { display: true, text: xLabel, color: '#5e6e8a', font: { size: 9 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5e6e8a', font: { size: 8 } },
+            title: { display: true, text: yLabel, color: '#5e6e8a', font: { size: 9 } }
+          }
+        }
+      }
+    });
+  };
+
+  const tempEdges = [40, 48, 54, 60, 66, 72, 78, 84, 92];
+  const tempLabels = tempEdges.slice(0,-1).map((v,i) => v+'–'+tempEdges[i+1]);
+  const tempCounts = gaussianBins(62, 11, tempEdges.slice(0,-1).map((v,i) => (v+tempEdges[i+1])/2)).map(v => Math.round(v*2.8));
+  const tempBin = tempEdges.findIndex((v,i) => i < tempEdges.length-1 && wx.temp >= v && wx.temp < tempEdges[i+1]);
+  makeHist('p1-dist-temp', tempLabels, tempCounts, tempBin < 0 ? tempEdges.length-2 : tempBin, '#40b4e5', 'Temperature (°F)', '# Games');
+
+  const windLabels = ['0–4','5–8','9–12','13–16','17–20','21–25','26+'];
+  const windCounts = [80, 140, 220, 280, 180, 70, 30];
+  const windBin = wx.wind <= 4 ? 0 : wx.wind <= 8 ? 1 : wx.wind <= 12 ? 2 : wx.wind <= 16 ? 3 : wx.wind <= 20 ? 4 : wx.wind <= 25 ? 5 : 6;
+  makeHist('p1-dist-wind', windLabels, windCounts, windBin, '#f5803e', 'Wind Speed (mph)', '# Games');
+}
+
 renderStadiumList();
 renderMain();
 </script>
