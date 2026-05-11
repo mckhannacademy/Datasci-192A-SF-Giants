@@ -5,7 +5,7 @@ Evaluation and comparison utilities for regression models.
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
@@ -13,20 +13,7 @@ import seaborn as sns
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-    """
-    Compute regression metrics.
-
-    Parameters
-    ----------
-    y_true : np.ndarray
-        True values
-    y_pred : np.ndarray
-        Predicted values
-
-    Returns
-    -------
-    Dict with RMSE, MAE, and R²
-    """
+    """Compute RMSE, MAE, and R²."""
     return {
         'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
         'mae': mean_absolute_error(y_true, y_pred),
@@ -34,254 +21,113 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     }
 
 
-def compare_models(
-    results: Dict[str, Dict[str, float]],
-    title: str = "Model Comparison"
-) -> pd.DataFrame:
-    """
-    Create a comparison table of model results.
-
-    Parameters
-    ----------
-    results : Dict
-        Dict of model_name -> metrics dict
-    title : str
-        Title for the comparison
-
-    Returns
-    -------
-    pd.DataFrame
-        Comparison table
-    """
+def compare_models(results: Dict[str, Dict[str, float]], title: str = "Model Comparison") -> pd.DataFrame:
+    """Create and print a comparison table of model results."""
     df = pd.DataFrame(results).T
     df.index.name = 'Model'
-
     print(f"\n{title}")
-    print("="*60)
+    print("=" * 60)
     print(df.to_string())
-
     return df
 
 
-def bootstrap_confidence_interval(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    metric_fn: callable,
-    n_bootstrap: int = 1000,
-    confidence: float = 0.95
-) -> Tuple[float, float, float]:
-    """
-    Compute bootstrap confidence interval for a metric.
-
-    Parameters
-    ----------
-    y_true : np.ndarray
-        True values
-    y_pred : np.ndarray
-        Predicted values
-    metric_fn : callable
-        Function that takes (y_true, y_pred) and returns a scalar
-    n_bootstrap : int
-        Number of bootstrap samples
-    confidence : float
-        Confidence level (e.g., 0.95 for 95% CI)
-
-    Returns
-    -------
-    Tuple of (point_estimate, lower_bound, upper_bound)
-    """
+def bootstrap_confidence_interval(y_true: np.ndarray, y_pred: np.ndarray, metric_fn: callable,
+                                    n_bootstrap: int = 1000, confidence: float = 0.95) -> Tuple[float, float, float]:
+    """Compute bootstrap confidence interval for a metric."""
     n = len(y_true)
-    bootstrapped_metrics = []
-
-    for _ in range(n_bootstrap):
-        indices = np.random.choice(n, size=n, replace=True)
-        metric = metric_fn(y_true[indices], y_pred[indices])
-        bootstrapped_metrics.append(metric)
-
+    bootstrapped = [metric_fn(y_true[idx := np.random.choice(n, n, replace=True)], y_pred[idx])
+                    for _ in range(n_bootstrap)]
     point_estimate = metric_fn(y_true, y_pred)
-    lower = np.percentile(bootstrapped_metrics, (1 - confidence) / 2 * 100)
-    upper = np.percentile(bootstrapped_metrics, (1 + confidence) / 2 * 100)
+    return (point_estimate,
+            np.percentile(bootstrapped, (1 - confidence) / 2 * 100),
+            np.percentile(bootstrapped, (1 + confidence) / 2 * 100))
 
-    return point_estimate, lower, upper
 
-
-def plot_predictions_vs_actual(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    title: str = "Predictions vs Actual",
-    ax: plt.Axes = None
-) -> plt.Axes:
-    """
-    Create a scatter plot of predictions vs actual values.
-
-    Parameters
-    ----------
-    y_true : np.ndarray
-        True values
-    y_pred : np.ndarray
-        Predicted values
-    title : str
-        Plot title
-    ax : plt.Axes, optional
-        Axes to plot on
-
-    Returns
-    -------
-    plt.Axes
-    """
+def plot_predictions_vs_actual(y_true: np.ndarray, y_pred: np.ndarray,
+                                title: str = "Predictions vs Actual", ax: plt.Axes = None) -> plt.Axes:
+    """Create a scatter plot of predictions vs actual values."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
 
     ax.scatter(y_true, y_pred, alpha=0.5, s=10)
-
-    # Perfect prediction line
-    min_val = min(y_true.min(), y_pred.min())
-    max_val = max(y_true.max(), y_pred.max())
+    min_val, max_val = min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())
     ax.plot([min_val, max_val], [min_val, max_val], 'r--', label='Perfect prediction')
-
     ax.set_xlabel('Actual')
     ax.set_ylabel('Predicted')
     ax.set_title(title)
     ax.legend()
 
-    # Add metrics annotation
     metrics = compute_metrics(y_true, y_pred)
-    text = f"RMSE: {metrics['rmse']:.3f}\nMAE: {metrics['mae']:.3f}\nR²: {metrics['r2']:.3f}"
-    ax.annotate(text, xy=(0.05, 0.95), xycoords='axes fraction',
-                fontsize=10, verticalalignment='top',
+    ax.annotate(f"RMSE: {metrics['rmse']:.3f}\nMAE: {metrics['mae']:.3f}\nR²: {metrics['r2']:.3f}",
+                xy=(0.05, 0.95), xycoords='axes fraction', fontsize=10, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
     return ax
 
 
-def plot_residuals(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    title: str = "Residuals",
-    ax: plt.Axes = None
-) -> plt.Axes:
-    """
-    Create a residual plot.
-
-    Parameters
-    ----------
-    y_true : np.ndarray
-        True values
-    y_pred : np.ndarray
-        Predicted values
-    title : str
-        Plot title
-    ax : plt.Axes, optional
-        Axes to plot on
-
-    Returns
-    -------
-    plt.Axes
-    """
+def plot_residuals(y_true: np.ndarray, y_pred: np.ndarray,
+                   title: str = "Residuals", ax: plt.Axes = None) -> plt.Axes:
+    """Create a residual plot."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 6))
 
-    residuals = y_true - y_pred
-
-    ax.scatter(y_pred, residuals, alpha=0.5, s=10)
+    ax.scatter(y_pred, y_true - y_pred, alpha=0.5, s=10)
     ax.axhline(y=0, color='r', linestyle='--')
-
     ax.set_xlabel('Predicted')
     ax.set_ylabel('Residual (Actual - Predicted)')
     ax.set_title(title)
-
     return ax
 
 
-def plot_residual_diagnostics(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    title_prefix: str = "Model",
-    figsize: Tuple[int, int] = (14, 10)
-) -> Tuple[plt.Figure, Dict[str, float]]:
-    """
-    Create comprehensive residual diagnostic plots.
+def _add_lowess(ax: plt.Axes, x: np.ndarray, y: np.ndarray, color: str = 'g', frac: float = 0.3):
+    """Add LOWESS smoothing line to an axes."""
+    try:
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+        sorted_idx = np.argsort(x)
+        smoothed = lowess(y[sorted_idx], x[sorted_idx], frac=frac)
+        ax.plot(smoothed[:, 0], smoothed[:, 1], f'{color}-', linewidth=2)
+    except ImportError:
+        pass
 
-    Generates a 2x2 grid of diagnostic plots:
-    1. Residuals vs Fitted (check for heteroscedasticity)
-    2. Q-Q Plot (check for normality)
-    3. Scale-Location Plot (check for homoscedasticity)
-    4. Histogram of Residuals (distribution shape)
 
-    Also computes statistical tests for model assumptions.
-
-    Parameters
-    ----------
-    y_true : np.ndarray
-        True values
-    y_pred : np.ndarray
-        Predicted values
-    title_prefix : str
-        Prefix for plot titles
-    figsize : Tuple[int, int]
-        Figure size
-
-    Returns
-    -------
-    Tuple[plt.Figure, Dict[str, float]]
-        Figure and dictionary of diagnostic statistics
-    """
+def plot_residual_diagnostics(y_true: np.ndarray, y_pred: np.ndarray,
+                               title_prefix: str = "Model", figsize: Tuple[int, int] = (14, 10)) -> Tuple[plt.Figure, Dict]:
+    """Create comprehensive residual diagnostic plots (2x2 grid)."""
     from scipy import stats
 
     residuals = y_true - y_pred
-    standardized_residuals = (residuals - np.mean(residuals)) / np.std(residuals)
+    std_residuals = (residuals - np.mean(residuals)) / np.std(residuals)
 
     fig, axes = plt.subplots(2, 2, figsize=figsize)
     fig.suptitle(f'{title_prefix} - Residual Diagnostics', fontsize=14, fontweight='bold')
 
-    # 1. Residuals vs Fitted
+    # Residuals vs Fitted
     ax1 = axes[0, 0]
     ax1.scatter(y_pred, residuals, alpha=0.5, s=10)
     ax1.axhline(y=0, color='r', linestyle='--', linewidth=2)
-
-    # Add lowess smoothing line to detect patterns
-    try:
-        from statsmodels.nonparametric.smoothers_lowess import lowess
-        sorted_idx = np.argsort(y_pred)
-        smoothed = lowess(residuals[sorted_idx], y_pred[sorted_idx], frac=0.3)
-        ax1.plot(smoothed[:, 0], smoothed[:, 1], 'g-', linewidth=2, label='LOWESS')
-        ax1.legend()
-    except ImportError:
-        pass
-
+    _add_lowess(ax1, y_pred, residuals, 'g')
     ax1.set_xlabel('Fitted Values')
     ax1.set_ylabel('Residuals')
-    ax1.set_title('Residuals vs Fitted\n(Check for heteroscedasticity)')
+    ax1.set_title('Residuals vs Fitted')
 
-    # 2. Q-Q Plot
+    # Q-Q Plot
     ax2 = axes[0, 1]
-    stats.probplot(standardized_residuals, dist="norm", plot=ax2)
-    ax2.set_title('Normal Q-Q Plot\n(Check for normality)')
+    stats.probplot(std_residuals, dist="norm", plot=ax2)
+    ax2.set_title('Normal Q-Q Plot')
     ax2.get_lines()[0].set_markersize(3)
     ax2.get_lines()[0].set_alpha(0.5)
 
-    # 3. Scale-Location Plot
+    # Scale-Location Plot
     ax3 = axes[1, 0]
-    sqrt_abs_residuals = np.sqrt(np.abs(standardized_residuals))
+    sqrt_abs_residuals = np.sqrt(np.abs(std_residuals))
     ax3.scatter(y_pred, sqrt_abs_residuals, alpha=0.5, s=10)
-
-    try:
-        from statsmodels.nonparametric.smoothers_lowess import lowess
-        sorted_idx = np.argsort(y_pred)
-        smoothed = lowess(sqrt_abs_residuals[sorted_idx], y_pred[sorted_idx], frac=0.3)
-        ax3.plot(smoothed[:, 0], smoothed[:, 1], 'r-', linewidth=2)
-    except ImportError:
-        pass
-
+    _add_lowess(ax3, y_pred, sqrt_abs_residuals, 'r')
     ax3.set_xlabel('Fitted Values')
     ax3.set_ylabel('√|Standardized Residuals|')
-    ax3.set_title('Scale-Location\n(Check for homoscedasticity)')
+    ax3.set_title('Scale-Location')
 
-    # 4. Histogram of Residuals
+    # Histogram
     ax4 = axes[1, 1]
-    ax4.hist(standardized_residuals, bins=30, density=True, alpha=0.7, color='steelblue')
-
-    # Overlay normal distribution
+    ax4.hist(std_residuals, bins=30, density=True, alpha=0.7, color='steelblue')
     x = np.linspace(-4, 4, 100)
     ax4.plot(x, stats.norm.pdf(x), 'r-', linewidth=2, label='Normal')
     ax4.set_xlabel('Standardized Residuals')
@@ -291,677 +137,263 @@ def plot_residual_diagnostics(
 
     plt.tight_layout()
 
-    # Compute diagnostic statistics
-    diagnostics = {}
-
-    # Shapiro-Wilk test (on sample if n > 5000)
+    # Compute diagnostics
     n = len(residuals)
-    if n > 5000:
-        sample_idx = np.random.choice(n, 5000, replace=False)
-        shapiro_stat, shapiro_p = stats.shapiro(residuals[sample_idx])
-        diagnostics['shapiro_note'] = 'Computed on 5000 sample'
-    else:
-        shapiro_stat, shapiro_p = stats.shapiro(residuals)
+    sample = residuals[np.random.choice(n, min(n, 5000), replace=False)] if n > 5000 else residuals
+    shapiro_stat, shapiro_p = stats.shapiro(sample)
 
-    diagnostics['shapiro_statistic'] = shapiro_stat
-    diagnostics['shapiro_p_value'] = shapiro_p
-    diagnostics['normality_assumption'] = 'OK' if shapiro_p > 0.05 else 'VIOLATED'
+    diagnostics = {
+        'shapiro_statistic': shapiro_stat, 'shapiro_p_value': shapiro_p,
+        'normality_assumption': 'OK' if shapiro_p > 0.05 else 'VIOLATED',
+        'residual_mean': np.mean(residuals), 'residual_std': np.std(residuals),
+        'residual_skewness': stats.skew(residuals), 'residual_kurtosis': stats.kurtosis(residuals)
+    }
 
-    # Durbin-Watson statistic (autocorrelation)
     try:
         from statsmodels.stats.stattools import durbin_watson
-        dw_stat = durbin_watson(residuals)
-        diagnostics['durbin_watson'] = dw_stat
-        # DW around 2 suggests no autocorrelation
-        diagnostics['autocorrelation'] = 'OK' if 1.5 < dw_stat < 2.5 else 'POSSIBLE'
+        dw = durbin_watson(residuals)
+        diagnostics['durbin_watson'] = dw
+        diagnostics['autocorrelation'] = 'OK' if 1.5 < dw < 2.5 else 'POSSIBLE'
     except ImportError:
-        diagnostics['durbin_watson'] = None
+        pass
 
-    # Breusch-Pagan test for heteroscedasticity
     try:
         from scipy.stats import spearmanr
         _, bp_p = spearmanr(y_pred, np.abs(residuals))
         diagnostics['heteroscedasticity_p'] = bp_p
         diagnostics['homoscedasticity'] = 'OK' if bp_p > 0.05 else 'VIOLATED'
     except Exception:
-        diagnostics['heteroscedasticity_p'] = None
+        pass
 
-    # Residual statistics
-    diagnostics['residual_mean'] = np.mean(residuals)
-    diagnostics['residual_std'] = np.std(residuals)
-    diagnostics['residual_skewness'] = stats.skew(residuals)
-    diagnostics['residual_kurtosis'] = stats.kurtosis(residuals)
-
-    # Print summary
-    print(f"\n{'='*60}")
-    print(f"RESIDUAL DIAGNOSTICS SUMMARY")
-    print(f"{'='*60}")
-    print(f"Sample size: {n}")
-    print(f"\nNormality (Shapiro-Wilk):")
-    print(f"  Statistic: {diagnostics['shapiro_statistic']:.4f}")
-    print(f"  p-value: {diagnostics['shapiro_p_value']:.4f}")
-    print(f"  Status: {diagnostics['normality_assumption']}")
-
-    if diagnostics.get('durbin_watson'):
-        print(f"\nAutocorrelation (Durbin-Watson):")
-        print(f"  Statistic: {diagnostics['durbin_watson']:.4f}")
-        print(f"  Status: {diagnostics['autocorrelation']}")
-
-    if diagnostics.get('heteroscedasticity_p'):
-        print(f"\nHomoscedasticity (Spearman correlation):")
-        print(f"  p-value: {diagnostics['heteroscedasticity_p']:.4f}")
-        print(f"  Status: {diagnostics['homoscedasticity']}")
-
-    print(f"\nResidual Statistics:")
-    print(f"  Mean: {diagnostics['residual_mean']:.4f} (should be ~0)")
-    print(f"  Std: {diagnostics['residual_std']:.4f}")
-    print(f"  Skewness: {diagnostics['residual_skewness']:.4f} (should be ~0)")
-    print(f"  Kurtosis: {diagnostics['residual_kurtosis']:.4f} (should be ~0)")
-    print(f"{'='*60}")
-
+    print(f"\nResidual Diagnostics: n={n}, Shapiro p={shapiro_p:.4f} ({diagnostics['normality_assumption']})")
     return fig, diagnostics
 
 
-def run_model_diagnostics(
-    fitter,
-    df_test: pd.DataFrame,
-    model_name: str = 'park_intercept',
-    target_name: str = 'strikeouts',
-    save_path: str = None
-) -> Dict[str, any]:
-    """
-    Run full diagnostic suite for a mixed-effects model.
+def run_model_diagnostics(fitter, df_test: pd.DataFrame, model_name: str = 'park_intercept',
+                           target_name: str = 'strikeouts', save_path: str = None) -> Dict:
+    """Run full diagnostic suite for a mixed-effects model."""
+    y_true, y_pred = df_test[fitter.target].values, fitter.predict(df_test, model_name)
+    valid = ~(np.isnan(y_true) | np.isnan(y_pred))
+    y_true, y_pred = y_true[valid], y_pred[valid]
 
-    Parameters
-    ----------
-    fitter : MixedEffectsModelFitter
-        Fitted model fitter
-    df_test : pd.DataFrame
-        Test data
-    model_name : str
-        Which model to diagnose
-    target_name : str
-        Name of target for display
-    save_path : str, optional
-        Path to save diagnostic plots
-
-    Returns
-    -------
-    Dict containing diagnostic results and figures
-    """
-    # Get predictions
-    y_true = df_test[fitter.target].values
-    y_pred = fitter.predict(df_test, model_name)
-
-    # Filter NaN values
-    valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
-    y_true = y_true[valid_mask]
-    y_pred = y_pred[valid_mask]
-
-    # Run diagnostics
-    fig, diagnostics = plot_residual_diagnostics(
-        y_true, y_pred,
-        title_prefix=f'{target_name.title()} - {model_name}'
-    )
+    fig, diagnostics = plot_residual_diagnostics(y_true, y_pred, f'{target_name.title()} - {model_name}')
 
     if save_path:
         fig.savefig(save_path, dpi=150, bbox_inches='tight')
         print(f"Saved diagnostic plot to {save_path}")
 
-    # Add model info
-    diagnostics['model_name'] = model_name
-    diagnostics['target'] = target_name
-    diagnostics['n_samples'] = len(y_true)
-
-    # Add model R² metrics
+    diagnostics.update({'model_name': model_name, 'target': target_name, 'n_samples': len(y_true)})
     try:
-        r2_metrics = fitter.compute_r_squared(model_name)
-        diagnostics['marginal_r2'] = r2_metrics['marginal_r2']
-        diagnostics['conditional_r2'] = r2_metrics['conditional_r2']
-    except Exception as e:
-        diagnostics['r2_error'] = str(e)
-
+        r2 = fitter.compute_r_squared(model_name)
+        diagnostics.update({'marginal_r2': r2['marginal_r2'], 'conditional_r2': r2['conditional_r2']})
+    except Exception:
+        pass
     return {'figure': fig, 'diagnostics': diagnostics}
 
 
-def plot_coefficient_importance(
-    coefs_df: pd.DataFrame,
-    top_n: int = 20,
-    title: str = "Top Feature Coefficients",
-    ax: plt.Axes = None
-) -> plt.Axes:
-    """
-    Plot top coefficient magnitudes.
-
-    Parameters
-    ----------
-    coefs_df : pd.DataFrame
-        DataFrame with 'feature' and 'coefficient' columns
-    top_n : int
-        Number of top features to show
-    title : str
-        Plot title
-    ax : plt.Axes, optional
-        Axes to plot on
-
-    Returns
-    -------
-    plt.Axes
-    """
+def plot_coefficient_importance(coefs_df: pd.DataFrame, top_n: int = 20,
+                                 title: str = "Top Feature Coefficients", ax: plt.Axes = None) -> plt.Axes:
+    """Plot top coefficient magnitudes."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 8))
 
-    top_coefs = coefs_df.head(top_n)
-
-    colors = ['green' if c > 0 else 'red' for c in top_coefs['coefficient']]
-    ax.barh(top_coefs['feature'], top_coefs['coefficient'], color=colors)
+    top = coefs_df.head(top_n)
+    colors = ['green' if c > 0 else 'red' for c in top['coefficient']]
+    ax.barh(top['feature'], top['coefficient'], color=colors)
     ax.set_xlabel('Coefficient')
     ax.set_title(title)
     ax.invert_yaxis()
-
     return ax
 
 
-def plot_park_embeddings_2d(
-    embeddings_df: pd.DataFrame,
-    title: str = "Park Embeddings (PCA Projection)",
-    ax: plt.Axes = None
-) -> plt.Axes:
-    """
-    Plot 2D PCA projection of park embeddings.
-
-    Parameters
-    ----------
-    embeddings_df : pd.DataFrame
-        Park embeddings with park names as index
-    title : str
-        Plot title
-    ax : plt.Axes, optional
-        Axes to plot on
-
-    Returns
-    -------
-    plt.Axes
-    """
+def plot_park_embeddings_2d(embeddings_df: pd.DataFrame, title: str = "Park Embeddings (PCA)",
+                             ax: plt.Axes = None) -> plt.Axes:
+    """Plot 2D PCA projection of park embeddings."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(12, 10))
 
-    # PCA projection
     pca = PCA(n_components=2)
-    embeddings_2d = pca.fit_transform(embeddings_df.values)
+    emb_2d = pca.fit_transform(embeddings_df.values)
+    ax.scatter(emb_2d[:, 0], emb_2d[:, 1], s=100, alpha=0.7)
 
-    # Plot
-    ax.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], s=100, alpha=0.7)
-
-    # Add park labels
     for i, park in enumerate(embeddings_df.index):
-        ax.annotate(park, (embeddings_2d[i, 0], embeddings_2d[i, 1]),
-                   fontsize=9, ha='center', va='bottom')
+        ax.annotate(park, (emb_2d[i, 0], emb_2d[i, 1]), fontsize=9, ha='center', va='bottom')
 
     ax.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
     ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
     ax.set_title(title)
-
     return ax
 
 
 def compute_park_similarity(embeddings_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute cosine similarity between park embeddings.
-
-    Parameters
-    ----------
-    embeddings_df : pd.DataFrame
-        Park embeddings with park names as index
-
-    Returns
-    -------
-    pd.DataFrame
-        Similarity matrix
-    """
+    """Compute cosine similarity between park embeddings."""
     from sklearn.metrics.pairwise import cosine_similarity
-
-    similarity = cosine_similarity(embeddings_df.values)
-    return pd.DataFrame(similarity, index=embeddings_df.index, columns=embeddings_df.index)
-
-
-def find_similar_parks(
-    embeddings_df: pd.DataFrame,
-    park: str,
-    top_n: int = 5
-) -> pd.DataFrame:
-    """
-    Find most similar parks based on embeddings.
-
-    Parameters
-    ----------
-    embeddings_df : pd.DataFrame
-        Park embeddings
-    park : str
-        Target park
-    top_n : int
-        Number of similar parks to return
-
-    Returns
-    -------
-    pd.DataFrame
-        Similar parks with similarity scores
-    """
-    similarity_matrix = compute_park_similarity(embeddings_df)
-    similarities = similarity_matrix[park].sort_values(ascending=False)
-
-    # Exclude the park itself
-    similarities = similarities[similarities.index != park]
-
-    return similarities.head(top_n).to_frame(name='similarity')
+    sim = cosine_similarity(embeddings_df.values)
+    return pd.DataFrame(sim, index=embeddings_df.index, columns=embeddings_df.index)
 
 
-def create_full_comparison_report(
-    ridge_k_model,
-    ridge_runs_model,
-    lasso_k_model,
-    lasso_runs_model,
-    nn_k_trainer,
-    nn_runs_trainer,
-    splits: Dict,
-    nn_data: Dict,
-    output_dir: str = None
-):
-    """
-    Create a comprehensive comparison report of all models.
+def find_similar_parks(embeddings_df: pd.DataFrame, park: str, top_n: int = 5) -> pd.DataFrame:
+    """Find most similar parks based on embeddings."""
+    sim = compute_park_similarity(embeddings_df)[park].sort_values(ascending=False)
+    return sim[sim.index != park].head(top_n).to_frame(name='similarity')
 
-    Parameters
-    ----------
-    ridge_k_model : ParkWeatherRegressor
-        Ridge model for strikeouts
-    ridge_runs_model : ParkWeatherRegressor
-        Ridge model for runs
-    lasso_k_model : ParkWeatherRegressor
-        Lasso model for strikeouts
-    lasso_runs_model : ParkWeatherRegressor
-        Lasso model for runs
-    nn_k_trainer : EmbeddingModelTrainer
-        NN model for strikeouts
-    nn_runs_trainer : EmbeddingModelTrainer
-        NN model for runs
-    splits : Dict
-        Data splits from data_prep
-    nn_data : Dict
-        NN data from data_prep
-    output_dir : str, optional
-        Directory to save plots
-    """
-    # Collect metrics for strikeouts
+
+def create_full_comparison_report(ridge_k, ridge_runs, lasso_k, lasso_runs,
+                                   nn_k, nn_runs, splits: Dict, nn_data: Dict,
+                                   output_dir: str = None):
+    """Create a comprehensive comparison report of all models."""
     k_results = {
-        'Ridge': ridge_k_model.evaluate(splits['X_test'], splits['y_test_strikeouts']),
-        'Lasso': lasso_k_model.evaluate(splits['X_test'], splits['y_test_strikeouts']),
-        'Neural Net': nn_k_trainer.evaluate(
-            nn_data['X_weather_test'],
-            nn_data['park_ids_test'],
-            nn_data['y_test_strikeouts']
-        )
+        'Ridge': ridge_k.evaluate(splits['X_test'], splits['y_test_strikeouts']),
+        'Lasso': lasso_k.evaluate(splits['X_test'], splits['y_test_strikeouts']),
+        'Neural Net': nn_k.evaluate(nn_data['X_weather_test'], nn_data['park_ids_test'], nn_data['y_test_strikeouts'])
     }
-
-    # Collect metrics for runs
     runs_results = {
-        'Ridge': ridge_runs_model.evaluate(splits['X_test'], splits['y_test_runs']),
-        'Lasso': lasso_runs_model.evaluate(splits['X_test'], splits['y_test_runs']),
-        'Neural Net': nn_runs_trainer.evaluate(
-            nn_data['X_weather_test'],
-            nn_data['park_ids_test'],
-            nn_data['y_test_runs']
-        )
+        'Ridge': ridge_runs.evaluate(splits['X_test'], splits['y_test_runs']),
+        'Lasso': lasso_runs.evaluate(splits['X_test'], splits['y_test_runs']),
+        'Neural Net': nn_runs.evaluate(nn_data['X_weather_test'], nn_data['park_ids_test'], nn_data['y_test_runs'])
     }
 
-    # Print comparison tables
-    print("\n" + "="*60)
-    compare_models(k_results, "STRIKEOUTS Model Comparison (Test Set)")
-    compare_models(runs_results, "RUNS Model Comparison (Test Set)")
+    compare_models(k_results, "STRIKEOUTS Model Comparison")
+    compare_models(runs_results, "RUNS Model Comparison")
 
-    # Create visualization figure
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
     fig.suptitle('Model Comparison', fontsize=14, fontweight='bold')
 
-    # Strikeouts predictions
-    y_true_k = splits['y_test_strikeouts']
-    ridge_pred_k = ridge_k_model.predict(splits['X_test'])
-    lasso_pred_k = lasso_k_model.predict(splits['X_test'])
-    nn_pred_k = nn_k_trainer.predict(nn_data['X_weather_test'], nn_data['park_ids_test'])
-
-    plot_predictions_vs_actual(y_true_k, ridge_pred_k, "Ridge: Strikeouts", axes[0, 0])
-    plot_predictions_vs_actual(y_true_k, lasso_pred_k, "Lasso: Strikeouts", axes[0, 1])
-    plot_predictions_vs_actual(y_true_k, nn_pred_k, "NN: Strikeouts", axes[0, 2])
-
-    # Runs predictions
-    y_true_runs = splits['y_test_runs']
-    ridge_pred_runs = ridge_runs_model.predict(splits['X_test'])
-    lasso_pred_runs = lasso_runs_model.predict(splits['X_test'])
-    nn_pred_runs = nn_runs_trainer.predict(nn_data['X_weather_test'], nn_data['park_ids_test'])
-
-    plot_predictions_vs_actual(y_true_runs, ridge_pred_runs, "Ridge: Runs", axes[1, 0])
-    plot_predictions_vs_actual(y_true_runs, lasso_pred_runs, "Lasso: Runs", axes[1, 1])
-    plot_predictions_vs_actual(y_true_runs, nn_pred_runs, "NN: Runs", axes[1, 2])
+    for row, (y_true, models, target) in enumerate([
+        (splits['y_test_strikeouts'], [(ridge_k, 'Ridge'), (lasso_k, 'Lasso'), (nn_k, 'NN')], 'Strikeouts'),
+        (splits['y_test_runs'], [(ridge_runs, 'Ridge'), (lasso_runs, 'Lasso'), (nn_runs, 'NN')], 'Runs')
+    ]):
+        for col, (model, name) in enumerate(models):
+            if name == 'NN':
+                y_pred = model.predict(nn_data['X_weather_test'], nn_data['park_ids_test'])
+            else:
+                y_pred = model.predict(splits['X_test'])
+            plot_predictions_vs_actual(y_true, y_pred, f"{name}: {target}", axes[row, col])
 
     plt.tight_layout()
-
     if output_dir:
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path / 'model_comparison.png', dpi=150, bbox_inches='tight')
-        print(f"\nSaved comparison plot to {output_path / 'model_comparison.png'}")
-
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        fig.savefig(Path(output_dir) / 'model_comparison.png', dpi=150, bbox_inches='tight')
     plt.close(fig)
-
     return k_results, runs_results
 
 
-# ============================================================================
-# RAW vs DEVIATION MODEL COMPARISON UTILITIES
-# ============================================================================
+def compare_raw_vs_deviation(raw_fitter, dev_fitter, df_test: pd.DataFrame,
+                              target_name: str = 'strikeouts') -> Dict:
+    """Compare raw and deviation models on raw scale."""
+    results = {'target': target_name, 'raw_model': {}, 'deviation_model': {}}
+    df_valid = df_test.dropna(subset=[dev_fitter.expected_col]).copy()
 
-def compare_raw_vs_deviation(
-    raw_fitter,
-    dev_fitter,
-    df_test: pd.DataFrame,
-    target_name: str = 'strikeouts'
-) -> Dict:
-    """
-    Side-by-side comparison of raw and deviation models.
-
-    Both models are evaluated on RAW scale for fair comparison.
-
-    Parameters
-    ----------
-    raw_fitter : MixedEffectsModelFitter
-        Model trained on raw targets (e.g., away_bat_k)
-    dev_fitter : MixedEffectsModelFitter
-        Model trained on deviation targets (e.g., deviation_away_k)
-    df_test : pd.DataFrame
-        Test data with both raw and deviation targets
-    target_name : str
-        Name for display purposes ('strikeouts' or 'runs')
-
-    Returns
-    -------
-    Dict containing:
-        - raw_model: metrics dict
-        - deviation_model: metrics dict on raw scale
-        - improvement: percentage improvement in RMSE
-        - weather_coef_comparison: DataFrame comparing coefficients
-    """
-    results = {
-        'target': target_name,
-        'raw_model': {},
-        'deviation_model': {}
-    }
-
-    # Filter test data to valid deviations
-    df_test_valid = df_test.dropna(subset=[dev_fitter.expected_col]).copy()
-
-    # Try different model complexities
     for model_name in ['park_intercept', 'park_slopes', 'fixed_weather']:
         try:
-            # Raw model evaluation
-            raw_metrics = raw_fitter.evaluate(df_test_valid, model_name)
-            results['raw_model'][model_name] = raw_metrics
+            results['raw_model'][model_name] = raw_fitter.evaluate(df_valid, model_name)
         except Exception as e:
             results['raw_model'][model_name] = {'error': str(e)}
-
         try:
-            # Deviation model evaluation ON RAW SCALE
-            dev_metrics = dev_fitter.evaluate_on_raw_scale(df_test_valid, model_name)
-            results['deviation_model'][model_name] = dev_metrics
+            results['deviation_model'][model_name] = dev_fitter.evaluate_on_raw_scale(df_valid, model_name)
         except Exception as e:
             results['deviation_model'][model_name] = {'error': str(e)}
 
-    # Compute improvement for best model
-    best_model = 'park_intercept'  # Default
-    for model_name in ['park_slopes', 'park_intercept']:
-        if (model_name in results['raw_model'] and
-            'error' not in results['raw_model'][model_name] and
-            model_name in results['deviation_model'] and
-            'error' not in results['deviation_model'][model_name]):
-            best_model = model_name
+    best = 'park_intercept'
+    for m in ['park_slopes', 'park_intercept']:
+        if 'error' not in results['raw_model'].get(m, {}) and 'error' not in results['deviation_model'].get(m, {}):
+            best = m
             break
 
-    if ('error' not in results['raw_model'].get(best_model, {'error': True}) and
-        'error' not in results['deviation_model'].get(best_model, {'error': True})):
+    if 'error' not in results['raw_model'].get(best, {'error': True}) and \
+       'error' not in results['deviation_model'].get(best, {'error': True}):
+        raw_rmse = results['raw_model'][best]['RMSE']
+        dev_rmse = results['deviation_model'][best]['RMSE']
+        results['improvement'] = {'model': best, 'raw_rmse': raw_rmse, 'dev_rmse': dev_rmse,
+                                  'pct_improvement': (raw_rmse - dev_rmse) / raw_rmse * 100}
 
-        raw_rmse = results['raw_model'][best_model]['RMSE']
-        dev_rmse = results['deviation_model'][best_model]['RMSE']
-        improvement = (raw_rmse - dev_rmse) / raw_rmse * 100
-        results['improvement'] = {
-            'model': best_model,
-            'raw_rmse': raw_rmse,
-            'dev_rmse': dev_rmse,
-            'pct_improvement': improvement
-        }
-    else:
-        results['improvement'] = None
-
-    # Compare weather coefficients
     try:
-        raw_fe = raw_fitter.get_fixed_effects(best_model)
-        dev_fe = dev_fitter.get_fixed_effects(best_model)
-
-        # Merge on parameter name
-        raw_fe = raw_fe.rename(columns={
-            'Coefficient': 'Raw_Coef',
-            'Std_Error': 'Raw_SE',
-            'p_value': 'Raw_p'
-        })
-        dev_fe = dev_fe.rename(columns={
-            'Coefficient': 'Dev_Coef',
-            'Std_Error': 'Dev_SE',
-            'p_value': 'Dev_p'
-        })
-
-        coef_comparison = pd.merge(
-            raw_fe[['Parameter', 'Raw_Coef', 'Raw_SE', 'Raw_p']],
-            dev_fe[['Parameter', 'Dev_Coef', 'Dev_SE', 'Dev_p']],
-            on='Parameter',
-            how='outer'
-        )
-        results['weather_coef_comparison'] = coef_comparison
-    except Exception as e:
+        raw_fe = raw_fitter.get_fixed_effects(best).rename(columns={'Coefficient': 'Raw_Coef', 'p_value': 'Raw_p'})
+        dev_fe = dev_fitter.get_fixed_effects(best).rename(columns={'Coefficient': 'Dev_Coef', 'p_value': 'Dev_p'})
+        results['weather_coef_comparison'] = pd.merge(
+            raw_fe[['Parameter', 'Raw_Coef', 'Raw_p']], dev_fe[['Parameter', 'Dev_Coef', 'Dev_p']],
+            on='Parameter', how='outer')
+    except Exception:
         results['weather_coef_comparison'] = None
-        results['coef_error'] = str(e)
-
     return results
 
 
-def compare_variance_decomposition(
-    raw_fitter,
-    dev_fitter,
-    model_name: str = 'park_intercept'
-) -> pd.DataFrame:
-    """
-    Compare variance decomposition between raw and deviation models.
-
-    Parameters
-    ----------
-    raw_fitter : MixedEffectsModelFitter
-        Raw target model
-    dev_fitter : MixedEffectsModelFitter
-        Deviation target model
-    model_name : str
-        Which model to compare
-
-    Returns
-    -------
-    pd.DataFrame
-        Variance components from both models side-by-side
-    """
+def compare_variance_decomposition(raw_fitter, dev_fitter, model_name: str = 'park_intercept') -> Optional[pd.DataFrame]:
+    """Compare variance decomposition between raw and deviation models."""
     try:
-        raw_vc = raw_fitter.get_variance_components(model_name)
-        raw_vc = raw_vc.rename(columns={
-            'Variance': 'Raw_Variance',
-            'Pct_of_Total': 'Raw_Pct'
-        })
-
-        dev_vc = dev_fitter.get_variance_components(model_name)
-        dev_vc = dev_vc.rename(columns={
-            'Variance': 'Dev_Variance',
-            'Pct_of_Total': 'Dev_Pct'
-        })
-
-        comparison = pd.merge(
-            raw_vc[['Source', 'Type', 'Raw_Variance', 'Raw_Pct']],
-            dev_vc[['Source', 'Type', 'Dev_Variance', 'Dev_Pct']],
-            on=['Source', 'Type'],
-            how='outer'
-        )
-
-        return comparison
+        raw_vc = raw_fitter.get_variance_components(model_name).rename(
+            columns={'Variance': 'Raw_Variance', 'Pct_of_Total': 'Raw_Pct'})
+        dev_vc = dev_fitter.get_variance_components(model_name).rename(
+            columns={'Variance': 'Dev_Variance', 'Pct_of_Total': 'Dev_Pct'})
+        return pd.merge(raw_vc[['Source', 'Type', 'Raw_Variance', 'Raw_Pct']],
+                        dev_vc[['Source', 'Type', 'Dev_Variance', 'Dev_Pct']],
+                        on=['Source', 'Type'], how='outer')
     except Exception as e:
-        print(f"Error comparing variance decomposition: {e}")
+        print(f"Error comparing variance: {e}")
         return None
 
 
-def bootstrap_model_comparison(
-    raw_fitter,
-    dev_fitter,
-    df_test: pd.DataFrame,
-    model_name: str = 'park_intercept',
-    n_bootstrap: int = 1000,
-    confidence: float = 0.95
-) -> Dict:
-    """
-    Bootstrap comparison of RMSE between raw and deviation models.
-
-    Parameters
-    ----------
-    raw_fitter : MixedEffectsModelFitter
-        Raw target model
-    dev_fitter : MixedEffectsModelFitter
-        Deviation target model
-    df_test : pd.DataFrame
-        Test data
-    model_name : str
-        Which model to compare
-    n_bootstrap : int
-        Number of bootstrap samples
-    confidence : float
-        Confidence level
-
-    Returns
-    -------
-    Dict with bootstrap confidence intervals for RMSE difference
-    """
-    # Get predictions
+def bootstrap_model_comparison(raw_fitter, dev_fitter, df_test: pd.DataFrame,
+                                model_name: str = 'park_intercept', n_bootstrap: int = 1000,
+                                confidence: float = 0.95) -> Dict:
+    """Bootstrap comparison of RMSE between raw and deviation models."""
     df_valid = df_test.dropna(subset=[dev_fitter.expected_col]).copy()
-
     y_true = df_valid[raw_fitter.target].values
     y_pred_raw = raw_fitter.predict(df_valid, model_name)
     y_pred_dev = dev_fitter.predict_raw(df_valid, model_name)
 
-    # Filter out NaN predictions
-    valid_mask = ~(np.isnan(y_pred_raw) | np.isnan(y_pred_dev))
-    y_true = y_true[valid_mask]
-    y_pred_raw = y_pred_raw[valid_mask]
-    y_pred_dev = y_pred_dev[valid_mask]
-
+    valid = ~(np.isnan(y_pred_raw) | np.isnan(y_pred_dev))
+    y_true, y_pred_raw, y_pred_dev = y_true[valid], y_pred_raw[valid], y_pred_dev[valid]
     n = len(y_true)
+
     rmse_diffs = []
-
     for _ in range(n_bootstrap):
-        indices = np.random.choice(n, size=n, replace=True)
+        idx = np.random.choice(n, n, replace=True)
+        rmse_diffs.append(np.sqrt(np.mean((y_true[idx] - y_pred_raw[idx])**2)) -
+                          np.sqrt(np.mean((y_true[idx] - y_pred_dev[idx])**2)))
 
-        rmse_raw = np.sqrt(np.mean((y_true[indices] - y_pred_raw[indices]) ** 2))
-        rmse_dev = np.sqrt(np.mean((y_true[indices] - y_pred_dev[indices]) ** 2))
-        rmse_diffs.append(rmse_raw - rmse_dev)
-
-    point_estimate = np.sqrt(np.mean((y_true - y_pred_raw) ** 2)) - \
-                     np.sqrt(np.mean((y_true - y_pred_dev) ** 2))
-
+    point = np.sqrt(np.mean((y_true - y_pred_raw)**2)) - np.sqrt(np.mean((y_true - y_pred_dev)**2))
     lower = np.percentile(rmse_diffs, (1 - confidence) / 2 * 100)
     upper = np.percentile(rmse_diffs, (1 + confidence) / 2 * 100)
 
-    # Positive difference means deviation model is better
-    return {
-        'rmse_diff': point_estimate,
-        'ci_lower': lower,
-        'ci_upper': upper,
-        'confidence': confidence,
-        'n_bootstrap': n_bootstrap,
-        'n_samples': n,
-        'significant': lower > 0 or upper < 0  # CI doesn't contain 0
-    }
+    return {'rmse_diff': point, 'ci_lower': lower, 'ci_upper': upper, 'confidence': confidence,
+            'n_bootstrap': n_bootstrap, 'n_samples': n, 'significant': lower > 0 or upper < 0}
 
 
-def plot_raw_vs_deviation_comparison(
-    comparison_results: Dict,
-    target_name: str = 'Strikeouts',
-    ax: plt.Axes = None
-) -> plt.Axes:
-    """
-    Plot comparison of raw vs deviation model performance.
-
-    Parameters
-    ----------
-    comparison_results : Dict
-        Output from compare_raw_vs_deviation()
-    target_name : str
-        Name for display
-    ax : plt.Axes, optional
-        Axes to plot on
-
-    Returns
-    -------
-    plt.Axes
-    """
+def plot_raw_vs_deviation_comparison(comparison_results: Dict, target_name: str = 'Strikeouts',
+                                      ax: plt.Axes = None) -> plt.Axes:
+    """Plot comparison of raw vs deviation model performance."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 6))
 
-    models = []
-    raw_rmse = []
-    dev_rmse = []
-
-    for model_name in ['fixed_weather', 'park_intercept', 'park_slopes']:
-        if (model_name in comparison_results['raw_model'] and
-            model_name in comparison_results['deviation_model'] and
-            'error' not in comparison_results['raw_model'][model_name] and
-            'error' not in comparison_results['deviation_model'][model_name]):
-
-            models.append(model_name)
-            raw_rmse.append(comparison_results['raw_model'][model_name]['RMSE'])
-            dev_rmse.append(comparison_results['deviation_model'][model_name]['RMSE'])
+    models, raw_rmse, dev_rmse = [], [], []
+    for m in ['fixed_weather', 'park_intercept', 'park_slopes']:
+        if ('error' not in comparison_results['raw_model'].get(m, {}) and
+            'error' not in comparison_results['deviation_model'].get(m, {})):
+            models.append(m)
+            raw_rmse.append(comparison_results['raw_model'][m]['RMSE'])
+            dev_rmse.append(comparison_results['deviation_model'][m]['RMSE'])
 
     x = np.arange(len(models))
     width = 0.35
-
     bars1 = ax.bar(x - width/2, raw_rmse, width, label='Raw Model', color='steelblue')
     bars2 = ax.bar(x + width/2, dev_rmse, width, label='Deviation Model', color='darkorange')
 
     ax.set_xlabel('Model Complexity')
     ax.set_ylabel('RMSE (on raw scale)')
-    ax.set_title(f'{target_name}: Raw vs Deviation Model Comparison')
+    ax.set_title(f'{target_name}: Raw vs Deviation Model')
     ax.set_xticks(x)
     ax.set_xticklabels(models)
     ax.legend()
 
-    # Add value labels
-    for bar in bars1:
-        height = bar.get_height()
-        ax.annotate(f'{height:.3f}',
-                    xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),
-                    textcoords="offset points",
-                    ha='center', va='bottom', fontsize=8)
-
-    for bar in bars2:
-        height = bar.get_height()
-        ax.annotate(f'{height:.3f}',
-                    xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),
-                    textcoords="offset points",
-                    ha='center', va='bottom', fontsize=8)
-
+    for bars in [bars1, bars2]:
+        for bar in bars:
+            ax.annotate(f'{bar.get_height():.3f}', xy=(bar.get_x() + bar.get_width()/2, bar.get_height()),
+                       xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
     return ax
 
 
 if __name__ == '__main__':
-    # Example usage
     from data_prep import load_all_team_data, prepare_features, train_test_split_by_season, prepare_nn_data
     from ridge_lasso_model import train_all_models
     from nn_embedding_model import train_nn_models
@@ -971,28 +403,14 @@ if __name__ == '__main__':
 
     print("Loading data...")
     df = load_all_team_data(data_dir)
-
-    print("\nPreparing features...")
     X, y_k, y_runs = prepare_features(df, include_interactions=True)
     splits = train_test_split_by_season(df, X, y_k, y_runs)
-
-    print("\nPreparing NN data...")
     nn_data = prepare_nn_data(df)
 
-    # Train all models
-    print("\n" + "="*60)
-    print("TRAINING ALL MODELS")
-    print("="*60)
-
+    print("\nTraining models...")
     ridge_k, ridge_runs = train_all_models(splits, model_type='ridge')
     lasso_k, lasso_runs = train_all_models(splits, model_type='lasso')
     nn_k, nn_runs = train_nn_models(nn_data, embedding_dim=8, epochs=100)
 
-    # Create comparison report
-    k_results, runs_results = create_full_comparison_report(
-        ridge_k, ridge_runs,
-        lasso_k, lasso_runs,
-        nn_k, nn_runs,
-        splits, nn_data,
-        output_dir=script_dir.parent / 'analysis' / 'model_outputs'
-    )
+    create_full_comparison_report(ridge_k, ridge_runs, lasso_k, lasso_runs, nn_k, nn_runs,
+                                   splits, nn_data, output_dir=script_dir.parent / 'analysis' / 'model_outputs')
