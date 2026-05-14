@@ -605,14 +605,40 @@ function findAnalogs(rows, wx, n = 6) {
   return scored;
 }
 
+const PARK_FACTOR_WEIGHTS = Object.freeze({ runs: 0.5, strikeouts: 0.5 });
+
+function getAwayStrikeouts(row) {
+  const value = parseFloat(row.away_bat_k || row.strikeouts || row.away_strikeouts);
+  return Number.isFinite(value) ? value : NaN;
+}
+
+function computeRSKPF(runParkFactor, strikeoutParkFactor, wR = PARK_FACTOR_WEIGHTS.runs, wK = PARK_FACTOR_WEIGHTS.strikeouts) {
+  const safeRunPf = Number.isFinite(runParkFactor) && runParkFactor > 0 ? runParkFactor : 100;
+  const safeStrikeoutPf = Number.isFinite(strikeoutParkFactor) && strikeoutParkFactor > 0 ? strikeoutParkFactor : 100;
+  return +(100 * Math.exp(
+    wR * Math.log(safeRunPf / 100) - wK * Math.log(safeStrikeoutPf / 100)
+  )).toFixed(1);
+}
+
 // Compute real per-game park factor from data rows
 function computeRealParkFactors(rows) {
-  return rows
-    .filter(r => parseFloat(r.away_runs_scored) > 0)
-    .map(r => ({
-      date: r.game_date,
-      pf:   +((parseFloat(r.home_runs_scored) / parseFloat(r.away_runs_scored)) * 100).toFixed(1),
-    }))
+  const validRows = rows.filter(r => Number.isFinite(parseFloat(r.away_runs_scored)));
+  const runBaseline = validRows.reduce((sum, r) => sum + parseFloat(r.away_runs_scored), 0) / (validRows.length || 1);
+  const strikeoutVals = validRows.map(getAwayStrikeouts).filter(v => Number.isFinite(v));
+  const strikeoutBaseline = strikeoutVals.reduce((sum, v) => sum + v, 0) / (strikeoutVals.length || 1);
+
+  return validRows
+    .map(r => {
+      const runPf = (parseFloat(r.away_runs_scored) / runBaseline) * 100;
+      const strikeouts = getAwayStrikeouts(r);
+      const strikeoutPf = Number.isFinite(strikeouts) && strikeoutBaseline > 0
+        ? (strikeouts / strikeoutBaseline) * 100
+        : 100;
+      return {
+        date: r.game_date,
+        pf: computeRSKPF(runPf, strikeoutPf),
+      };
+    })
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -839,14 +865,19 @@ function computeProjection(wx, stadium) {
   const rBase = rC.intercept + rPark;
 
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
-  const parkFactor = +((rPred / rBase) * 100).toFixed(1);
+  const runParkFactor = +((rPred / rBase) * 100).toFixed(1);
+  const strikeoutParkFactor = +((kPred / kBase) * 100).toFixed(1);
+  const parkFactor = computeRSKPF(runParkFactor, strikeoutParkFactor);
 
   return {
     kPred:      +kPred.toFixed(2),
     rPred:      +rPred.toFixed(2),
     kDelta:     +(kPred - kBase).toFixed(2),
     runsDelta:  +(rPred - rBase).toFixed(2),
+    kBase:      +kBase.toFixed(2),
     rBase:      +rBase.toFixed(2),
+    runParkFactor,
+    strikeoutParkFactor,
     parkFactor,
     windEffect,
     wind_cf:    +wind_cf.toFixed(2),
@@ -969,11 +1000,15 @@ function renderMain() {
         <div class="panel" style="flex:1;">
           <div class="panel-header">
             <div class="panel-title">Predicted Park Factor</div>
-            <div class="panel-tag">Ridge model · Away runs ratio</div>
+            <div class="panel-tag">Ridge model · RSKPF</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0;flex:1;">
             <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
             <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= 100 ? '+' : ''}${(p.parkFactor - 100).toFixed(1)} vs. neutral (100)</div>
+            <div style="font-size:11px;color:var(--text2);text-align:center;max-width:300px;line-height:1.6">
+              RSKPF = 100 × exp(wR ln(RPF/100) - wK ln(KPF/100))<br>
+              RPF: <span style="font-family:var(--font-m);color:var(--text1)">${p.runParkFactor}</span> · KPF: <span style="font-family:var(--font-m);color:var(--text1)">${p.strikeoutParkFactor}</span> · wR/wK = <span style="font-family:var(--font-m);color:var(--text1)">${PARK_FACTOR_WEIGHTS.runs.toFixed(1)}/${PARK_FACTOR_WEIGHTS.strikeouts.toFixed(1)}</span>
+            </div>
           </div>
         </div>
         ` : ''}
@@ -1003,6 +1038,9 @@ function renderMain() {
       </div>
       <div class="chart-area" style="height:160px;">
         <canvas id="pf-chart"></canvas>
+      </div>
+      <div style="font-size:11px;color:var(--text2)">
+        Bars = historical yearly RSKPF from runs + strikeouts. Amber line = today's model prediction (${p.parkFactor}).
       </div>
     </div>
 
@@ -1505,21 +1543,32 @@ function renderParkFactorChart(p) {
       const yr = r.season || (r.game_date || '').slice(0, 4);
       if (!yr) return;
       const awayRuns = parseFloat(r.away_runs_scored);
-      const homeRuns = parseFloat(r.home_runs_scored);
-      if (isNaN(awayRuns) || isNaN(homeRuns)) return;
-      if (!yearMap[yr]) yearMap[yr] = { away: [], home: [] };
-      yearMap[yr].away.push(awayRuns);
-      yearMap[yr].home.push(homeRuns);
+      const awayStrikeouts = getAwayStrikeouts(r);
+      if (isNaN(awayRuns)) return;
+      if (!yearMap[yr]) yearMap[yr] = { runs: [], strikeouts: [] };
+      yearMap[yr].runs.push(awayRuns);
+      if (Number.isFinite(awayStrikeouts)) yearMap[yr].strikeouts.push(awayStrikeouts);
     });
 
-    // Overall average away runs as baseline
+    // Overall averages provide the neutral baseline for each component
     const allAway = stadiumRows.map(r => parseFloat(r.away_runs_scored)).filter(v => !isNaN(v));
-    const baseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
+    const runBaseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
+    const allStrikeouts = stadiumRows.map(getAwayStrikeouts).filter(v => Number.isFinite(v));
+    const strikeoutBaseline = allStrikeouts.length
+      ? allStrikeouts.reduce((a, b) => a + b, 0) / allStrikeouts.length
+      : NaN;
 
     labels   = Object.keys(yearMap).sort();
     histData = labels.map(yr => {
-      const avg = yearMap[yr].away.reduce((a, b) => a + b, 0) / yearMap[yr].away.length;
-      return +((avg / baseline) * 100).toFixed(1);
+      const avgRuns = yearMap[yr].runs.reduce((a, b) => a + b, 0) / yearMap[yr].runs.length;
+      const runPf = (avgRuns / runBaseline) * 100;
+      const avgStrikeouts = yearMap[yr].strikeouts.length
+        ? yearMap[yr].strikeouts.reduce((a, b) => a + b, 0) / yearMap[yr].strikeouts.length
+        : NaN;
+      const strikeoutPf = Number.isFinite(avgStrikeouts) && Number.isFinite(strikeoutBaseline) && strikeoutBaseline > 0
+        ? (avgStrikeouts / strikeoutBaseline) * 100
+        : 100;
+      return computeRSKPF(runPf, strikeoutPf);
     });
     isReal = true;
   } else {
@@ -1535,7 +1584,7 @@ function renderParkFactorChart(p) {
       labels,
       datasets: [
         {
-          label: isReal ? 'Avg Park Factor by Year' : 'Park Factor (placeholder)',
+          label: isReal ? 'Avg RSKPF by Year' : 'RSKPF (placeholder)',
           data: histData,
           backgroundColor: histData.map(v => v >= 100 ? 'rgba(52,199,123,0.6)' : 'rgba(232,80,80,0.6)'),
           borderRadius: 4,
@@ -1562,7 +1611,7 @@ function renderParkFactorChart(p) {
         tooltip: {
           callbacks: {
             label: ctx => ctx.datasetIndex === 0
-              ? `Avg PF: ${ctx.parsed.y.toFixed(1)}`
+              ? `Avg RSKPF: ${ctx.parsed.y.toFixed(1)}`
               : `Today's projection: ${ctx.parsed.y.toFixed(1)}`
           }
         }
