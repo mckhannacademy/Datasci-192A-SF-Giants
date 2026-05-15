@@ -1199,13 +1199,16 @@ function buildInputTable(wx, stadium, p) {
 
   const rC = MODEL.runs;
   const kC = MODEL.strikeouts;
+  const rInter = rC.interactions[stadium.abbr] || {};
+  const kInter = kC.interactions[stadium.abbr] || {};
 
   let rows = '';
   for (const { key, label, raw } of features) {
     const { center, scale } = MODEL.scaling[key];
     const z    = (raw - center) / scale;
-    const rCon = rC[key] * z * d;
-    const kCon = kC[key] * z * d;
+    // Include park×weather interaction so this row's contribution is complete
+    const rCon = (rC[key] + (rInter[key] || 0)) * z * d;
+    const kCon = (kC[key] + (kInter[key] || 0)) * z * d;
     const rCol = rCon > 0.001 ? 'coef-pos' : rCon < -0.001 ? 'coef-neg' : '';
     const kCol = kCon > 0.001 ? 'coef-pos' : kCon < -0.001 ? 'coef-neg' : '';
     rows += `<tr>
@@ -1232,14 +1235,14 @@ function buildInputTable(wx, stadium, p) {
     <td class="td-mono ${rNight >= 0 ? 'coef-pos' : 'coef-neg'}">${rNight >= 0 ? '+' : ''}${rNight.toFixed(3)}</td>
     <td class="td-mono ${kNight >= 0 ? 'coef-pos' : 'coef-neg'}">${kNight >= 0 ? '+' : ''}${kNight.toFixed(3)}</td>
   </tr>`;
-  // Park effect row
-  const rPE = rC.park[stadium.abbr] || 0;
-  const kPE = kC.park[stadium.abbr] || 0;
-  rows += `<tr style="border-top:1px solid var(--line2)">
-    <td style="color:var(--text1)">Park effect (${stadium.abbr})</td>
-    <td class="td-mono" colspan="2" style="color:var(--text2)">fixed effect</td>
-    <td class="td-mono ${rPE >= 0 ? 'coef-pos' : 'coef-neg'}">${rPE >= 0 ? '+' : ''}${rPE.toFixed(3)}</td>
-    <td class="td-mono ${kPE >= 0 ? 'coef-pos' : 'coef-neg'}">${kPE >= 0 ? '+' : ''}${kPE.toFixed(3)}</td>
+  // Total row — exact delta from model
+  const rD = p.runsDelta;
+  const kD = p.kDelta;
+  rows += `<tr style="border-top:2px solid var(--line);font-weight:600">
+    <td style="color:var(--text0)">Total weather Δ</td>
+    <td class="td-mono" colspan="2" style="color:var(--text2)">exact model output</td>
+    <td class="td-mono ${rD >= 0 ? 'coef-pos' : 'coef-neg'}">${rD >= 0 ? '+' : ''}${rD.toFixed(3)}</td>
+    <td class="td-mono ${kD >= 0 ? 'coef-pos' : 'coef-neg'}">${kD >= 0 ? '+' : ''}${kD.toFixed(3)}</td>
   </tr>`;
   return rows;
 }
