@@ -821,8 +821,8 @@ function computeProjection(wx, stadium) {
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
 
   // RSKPF = 100 × exp(w_R × ln(RPF/100) − w_K × ln(KPF/100))
-  const W_R = 0.8;
-  const W_K = 0.2;
+  const W_R = 0.9;
+  const W_K = 1 - W_R;
   const RPF = (rPred / rBase) * 100;
   const KPF = (kPred / kBase) * 100;
   const parkFactor = +(100 * Math.exp(W_R * Math.log(RPF / 100) - W_K * Math.log(KPF / 100))).toFixed(1);
