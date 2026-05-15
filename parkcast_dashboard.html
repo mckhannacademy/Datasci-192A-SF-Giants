@@ -821,8 +821,8 @@ function computeProjection(wx, stadium) {
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
 
   // RSKPF = 100 × exp(w_R × ln(RPF/100) − w_K × ln(KPF/100))
-  const W_R = 0.9;
-  const W_K = 1 - W_R;
+  const W_R = 0.8;
+  const W_K = 0.2;
   const RPF = (rPred / rBase) * 100;
   const KPF = (kPred / kBase) * 100;
   const parkFactor = +(100 * Math.exp(W_R * Math.log(RPF / 100) - W_K * Math.log(KPF / 100))).toFixed(1);
@@ -991,7 +991,7 @@ function renderMain() {
         <div class="panel-title">Predicted vs. Historical Park Factor</div>
         <div class="panel-tag">${stadiumRows ? '2020–2025 · real game data' : ''}</div>
       </div>
-      <div class="chart-area" style="height:160px;">
+      <div class="chart-area" style="height:240px;">
         <canvas id="pf-chart"></canvas>
       </div>
     </div>
@@ -1019,19 +1019,19 @@ function renderMain() {
     <div class="dist-row">
       <div class="dist-card">
         <div class="dist-label">Temperature (°F)</div>
-        <div style="position:relative;height:140px"><canvas id="p1-dist-temp"></canvas></div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-temp"></canvas></div>
       </div>
       <div class="dist-card">
         <div class="dist-label">Wind Speed (mph)</div>
-        <div style="position:relative;height:140px"><canvas id="p1-dist-wind"></canvas></div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-wind"></canvas></div>
       </div>
       <div class="dist-card">
         <div class="dist-label">Humidity (%)</div>
-        <div style="position:relative;height:140px"><canvas id="p1-dist-rhum"></canvas></div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-rhum"></canvas></div>
       </div>
       <div class="dist-card">
         <div class="dist-label">Wind Direction</div>
-        <div style="position:relative;height:140px"><canvas id="p1-dist-winddir"></canvas></div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-winddir"></canvas></div>
       </div>
     </div>
 
@@ -1080,7 +1080,7 @@ function renderMain() {
     <div class="dist-row">
       <div class="dist-card">
         <div class="dist-label">Temperature (°F) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-temp"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-temp"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">58°F</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">50–66°F</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1089,7 +1089,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Pressure (hPa) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-press"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-press"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">1013 hPa</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">1010–1016</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1098,7 +1098,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Humidity (%) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-hum"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-hum"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">74%</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">63–83%</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1107,7 +1107,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Wind Speed (mph) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-wind"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-wind"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">14 mph</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">10–18 mph</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1234,13 +1234,18 @@ function buildInputTable(wx, stadium, p) {
     <td class="td-mono" style="color:var(--text2)">—</td>
     <td class="td-mono ${rNight >= 0 ? 'coef-pos' : 'coef-neg'}">${rNight >= 0 ? '+' : ''}${rNight.toFixed(3)}</td>
     <td class="td-mono ${kNight >= 0 ? 'coef-pos' : 'coef-neg'}">${kNight >= 0 ? '+' : ''}${kNight.toFixed(3)}</td>
+  </tr>
+  <tr>
+    <td colspan="5" style="font-size:9px;color:var(--text2);font-style:italic;padding-bottom:6px;line-height:1.4;">
+      This coefficient is estimated holding weather constant — it captures residual day/night effects (lighting, crowd, routine). Real-world night games are also typically colder and windier; use the sliders to reflect those conditions for the full picture.
+    </td>
   </tr>`;
   // Total row — exact delta from model
   const rD = p.runsDelta;
   const kD = p.kDelta;
   rows += `<tr style="border-top:2px solid var(--line);font-weight:600">
     <td style="color:var(--text0)">Total weather Δ</td>
-    <td class="td-mono" colspan="2" style="color:var(--text2)">exact model output</td>
+    <td class="td-mono" colspan="2" style="color:var(--text2)">.</td>
     <td class="td-mono ${rD >= 0 ? 'coef-pos' : 'coef-neg'}">${rD >= 0 ? '+' : ''}${rD.toFixed(3)}</td>
     <td class="td-mono ${kD >= 0 ? 'coef-pos' : 'coef-neg'}">${kD >= 0 ? '+' : ''}${kD.toFixed(3)}</td>
   </tr>`;
