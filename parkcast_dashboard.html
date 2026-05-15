@@ -112,7 +112,7 @@
 
   .dist-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; min-width: 0; }
   .dist-row.dist-row-2 { grid-template-columns: repeat(2, 1fr); }
-  .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
+  .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px 5px; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
   .dist-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text2); }
   .dist-stats { display: flex; justify-content: space-between; }
   .dist-stat { display: flex; flex-direction: column; gap: 2px; }
@@ -1016,7 +1016,7 @@ function renderMain() {
       <div class="section-divider-line"></div>
       <div class="panel-tag">Games per bucket · Historical</div>
     </div>
-    <div class="dist-row dist-row-2">
+    <div class="dist-row">
       <div class="dist-card">
         <div class="dist-label">Temperature (°F)</div>
         <div style="position:relative;height:140px"><canvas id="p1-dist-temp"></canvas></div>
@@ -1371,14 +1371,16 @@ function renderDistCharts() {
             }
           }
         },
+        layout: { padding: { top: 2, bottom: 0, left: 0, right: 0 } },
+        datasets: { bar: { barPercentage: 0.95, categoryPercentage: 0.9 } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
+          x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 8 }, maxRotation: 0 } },
           y: {
             display: true,
             min: yMin,
             max: yMax,
             grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#5e6e8a', font: { size: 8 }, maxTicksLimit: 4 },
+            ticks: { color: '#5e6e8a', font: { size: 7 }, maxTicksLimit: 3 },
           }
         }
       }
@@ -1598,16 +1600,18 @@ function renderPage1WeatherHists(wx) {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
+        layout: { padding: { top: 2, bottom: 0, left: 0, right: 0 } },
+        datasets: { bar: { barPercentage: 0.95, categoryPercentage: 0.9 } },
         scales: {
           x: {
             grid: { display: false },
-            ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 },
-            title: { display: true, text: xLabel, color: '#5e6e8a', font: { size: 9 } }
+            ticks: { color: '#5e6e8a', font: { size: 8 }, maxRotation: 0 },
+            title: { display: true, text: xLabel, color: '#5e6e8a', font: { size: 8 } }
           },
           y: {
             grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#5e6e8a', font: { size: 8 } },
-            title: { display: true, text: yLabel, color: '#5e6e8a', font: { size: 9 } }
+            ticks: { color: '#5e6e8a', font: { size: 7 } },
+            title: { display: false }
           }
         }
       }
