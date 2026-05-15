@@ -1331,6 +1331,16 @@ function renderDistCharts() {
       const tag = document.querySelector('.dist-row')?.closest('div')?.previousElementSibling?.querySelector('.panel-tag');
     }
 
+    // Compute tight y-axis bounds from data so monthly variance is visible
+    let yMin, yMax;
+    if (allValid.length > 1) {
+      const dataMin = Math.min(...allValid);
+      const dataMax = Math.max(...allValid);
+      const pad = Math.max((dataMax - dataMin) * 0.5, 1);
+      yMin = dataMin - pad;
+      yMax = dataMax + pad;
+    }
+
     const chart = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -1363,7 +1373,13 @@ function renderDistCharts() {
         },
         scales: {
           x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
-          y: { display: false }
+          y: {
+            display: true,
+            min: yMin,
+            max: yMax,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5e6e8a', font: { size: 8 }, maxTicksLimit: 4 },
+          }
         }
       }
     });
