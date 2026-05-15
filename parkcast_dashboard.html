@@ -839,7 +839,13 @@ function computeProjection(wx, stadium) {
   const rBase = rC.intercept + rPark;
 
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
-  const parkFactor = +((rPred / rBase) * 100).toFixed(1);
+
+  // RSKPF = 100 × exp(w_R × ln(RPF/100) − w_K × ln(KPF/100))
+  const W_R = 0.8;
+  const W_K = 0.2;
+  const RPF = (rPred / rBase) * 100;
+  const KPF = (kPred / kBase) * 100;
+  const parkFactor = +(100 * Math.exp(W_R * Math.log(RPF / 100) - W_K * Math.log(KPF / 100))).toFixed(1);
 
   return {
     kPred:      +kPred.toFixed(2),
@@ -974,6 +980,7 @@ function renderMain() {
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0;flex:1;">
             <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
             <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= 100 ? '+' : ''}${(p.parkFactor - 100).toFixed(1)} vs. neutral (100)</div>
+            <div style="font-size:10px;color:var(--text2);font-family:var(--font-mono,monospace);margin-top:6px;letter-spacing:0.02em;opacity:0.7;">100 · e<sup>0.8·ln(RPF/100) − 0.2·ln(KPF/100)</sup></div>
           </div>
         </div>
         ` : ''}
