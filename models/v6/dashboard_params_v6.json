@@ -1,0 +1,661 @@
+{
+  "_metadata": {
+    "version": "6.0.0",
+    "model_type": "ridge_interaction",
+    "generated_at": "2026-05-18",
+    "split_method": "random_month",
+    "train_test_split": "70/30 random month units",
+    "random_state": 42,
+    "scaler_type": "robust",
+    "features_used": [
+      "temp_f",
+      "rhum",
+      "wspd_mph",
+      "wind_cf",
+      "air_density",
+      "elevation_ft",
+      "is_night",
+      "marine_layer_day",
+      "marine_layer_night"
+    ],
+    "interaction_features": [
+      "temp_f",
+      "rhum",
+      "wspd_mph",
+      "wind_cf",
+      "air_density"
+    ],
+    "marine_layer_parks": [
+      "SF",
+      "OAK",
+      "SD",
+      "LAA",
+      "LAD",
+      "SEA"
+    ],
+    "marine_layer_description": "Pacific coast stadiums with marine layer (fog) influence. Marine layer typically suppresses offense, especially at night.",
+    "elevation_description": "Stadium elevation in feet. Higher elevation = thinner air = balls travel farther (more runs) but may not affect strikeouts as much.",
+    "elevation_by_park": {
+      "ARI": 1090.0,
+      "ATL": 1050.0,
+      "BAL": 20.0,
+      "BOS": 21.0,
+      "CHC": 595.0,
+      "CIN": 489.0,
+      "CLE": 660.0,
+      "COL": 5280.0,
+      "CWS": 595.0,
+      "DET": 585.0,
+      "HOU": 40.0,
+      "KC": 750.0,
+      "LAA": 160.0,
+      "LAD": 340.0,
+      "MIA": 10.0,
+      "MIL": 617.0,
+      "MIN": 815.0,
+      "NYM": 20.0,
+      "NYY": 55.0,
+      "OAK": -21.0,
+      "PHI": 20.0,
+      "PIT": 730.0,
+      "SD": 20.0,
+      "SEA": 16.0,
+      "SF": 65.0,
+      "STL": 455.0,
+      "TB": 15.0,
+      "TEX": 551.0,
+      "TOR": 300.0,
+      "WSH": 35.0
+    },
+    "roofed_stadiums": [
+      "ARI",
+      "HOU",
+      "MIA",
+      "MIL",
+      "SEA",
+      "TB",
+      "TEX",
+      "TOR"
+    ],
+    "new_in_v6": "Added elevation_ft as fixed effect and marine_layer \u00d7 day/night interactions.",
+    "n_interaction_terms": 150,
+    "optimal_alpha": 596.3623,
+    "performance_notes": {
+      "random_month_test_r2_strikeouts": 0.0403,
+      "random_month_test_r2_runs": 0.0226,
+      "interpretation": "Model explains ~4% of strikeout variance and ~2% of run variance from weather. Use for directional effects only."
+    }
+  },
+  "scaling": {
+    "temp_f": {
+      "center": 73.0,
+      "scale": 16.299999999999997
+    },
+    "rhum": {
+      "center": 62.7,
+      "scale": 26.0
+    },
+    "wspd_mph": {
+      "center": 7.0,
+      "scale": 4.699999999999999
+    },
+    "wind_cf": {
+      "center": 1.89,
+      "scale": 13.95
+    },
+    "air_density": {
+      "center": 1.170202923664053,
+      "scale": 0.04826472610949151
+    },
+    "elevation_ft": {
+      "center": 340.0,
+      "scale": 597.0
+    }
+  },
+  "strikeouts": {
+    "fixed_effects": {
+      "Intercept": 8.8864,
+      "temp_f": 0.1667,
+      "rhum": -0.0762,
+      "wspd_mph": 0.0265,
+      "wind_cf": 0.0073,
+      "air_density": 0.3409,
+      "is_night": -0.2258,
+      "elevation_ft": -0.0633,
+      "marine_layer_day": 0.0278,
+      "marine_layer_night": 0.0772
+    },
+    "park_effects": {
+      "ARI": 0.006,
+      "ATL": 0.2056,
+      "BAL": -0.4988,
+      "BOS": 0.1009,
+      "CHC": 0.1141,
+      "CIN": 0.2084,
+      "CLE": 0.355,
+      "COL": 0.0554,
+      "CWS": 0.1206,
+      "DET": -0.5231,
+      "HOU": 0.498,
+      "KC": -0.4946,
+      "LAA": 0.0465,
+      "LAD": 0.473,
+      "MIA": -0.0806,
+      "MIL": 0.3086,
+      "MIN": -0.1003,
+      "NYM": 0.277,
+      "NYY": 0.3445,
+      "OAK": -0.3673,
+      "PHI": 0.178,
+      "PIT": -0.2224,
+      "SD": 0.1487,
+      "SEA": -0.1212,
+      "SF": -0.0747,
+      "STL": -0.397,
+      "TB": 0.2243,
+      "TEX": -0.4726,
+      "TOR": -0.2288,
+      "WSH": -0.0831
+    },
+    "park_weather_interactions": {
+      "ARI": {
+        "temp_f": 0.0058,
+        "rhum": 0.1616,
+        "wspd_mph": -0.0104,
+        "wind_cf": -0.0123,
+        "air_density": -0.041
+      },
+      "ATL": {
+        "temp_f": -0.1007,
+        "rhum": -0.0931,
+        "wspd_mph": 0.0526,
+        "wind_cf": 0.0605,
+        "air_density": 0.0129
+      },
+      "BAL": {
+        "temp_f": 0.025,
+        "rhum": -0.2593,
+        "wspd_mph": -0.0026,
+        "wind_cf": 0.0136,
+        "air_density": -0.0757
+      },
+      "BOS": {
+        "temp_f": -0.1171,
+        "rhum": 0.2089,
+        "wspd_mph": 0.01,
+        "wind_cf": -0.0351,
+        "air_density": 0.0795
+      },
+      "CHC": {
+        "temp_f": -0.0215,
+        "rhum": 0.0431,
+        "wspd_mph": -0.002,
+        "wind_cf": 0.0324,
+        "air_density": 0.0263
+      },
+      "CIN": {
+        "temp_f": 0.1027,
+        "rhum": -0.0541,
+        "wspd_mph": -0.105,
+        "wind_cf": 0.0185,
+        "air_density": -0.0594
+      },
+      "CLE": {
+        "temp_f": -0.0056,
+        "rhum": -0.0105,
+        "wspd_mph": -0.0309,
+        "wind_cf": -0.0828,
+        "air_density": -0.038
+      },
+      "COL": {
+        "temp_f": -0.0809,
+        "rhum": 0.001,
+        "wspd_mph": 0.0184,
+        "wind_cf": -0.0076,
+        "air_density": -0.123
+      },
+      "CWS": {
+        "temp_f": 0.0216,
+        "rhum": -0.2054,
+        "wspd_mph": 0.0182,
+        "wind_cf": 0.0486,
+        "air_density": -0.0055
+      },
+      "DET": {
+        "temp_f": 0.22,
+        "rhum": 0.0335,
+        "wspd_mph": -0.1712,
+        "wind_cf": 0.0872,
+        "air_density": -0.0509
+      },
+      "HOU": {
+        "temp_f": 0.2752,
+        "rhum": 0.1943,
+        "wspd_mph": -0.0896,
+        "wind_cf": 0.0359,
+        "air_density": -0.1127
+      },
+      "KC": {
+        "temp_f": 0.0601,
+        "rhum": -0.1168,
+        "wspd_mph": -0.0103,
+        "wind_cf": 0.0744,
+        "air_density": 0.169
+      },
+      "LAA": {
+        "temp_f": 0.0269,
+        "rhum": 0.0085,
+        "wspd_mph": 0.0848,
+        "wind_cf": 0.0936,
+        "air_density": -0.0126
+      },
+      "LAD": {
+        "temp_f": -0.0003,
+        "rhum": -0.0678,
+        "wspd_mph": 0.037,
+        "wind_cf": 0.2844,
+        "air_density": -0.0883
+      },
+      "MIA": {
+        "temp_f": -0.1022,
+        "rhum": -0.0393,
+        "wspd_mph": 0.0363,
+        "wind_cf": -0.0654,
+        "air_density": 0.0377
+      },
+      "MIL": {
+        "temp_f": 0.0777,
+        "rhum": -0.1394,
+        "wspd_mph": -0.056,
+        "wind_cf": -0.209,
+        "air_density": -0.0081
+      },
+      "MIN": {
+        "temp_f": -0.148,
+        "rhum": 0.0837,
+        "wspd_mph": 0.053,
+        "wind_cf": -0.2017,
+        "air_density": 0.1432
+      },
+      "NYM": {
+        "temp_f": -0.0477,
+        "rhum": -0.0222,
+        "wspd_mph": 0.1319,
+        "wind_cf": -0.2025,
+        "air_density": 0.1552
+      },
+      "NYY": {
+        "temp_f": -0.0354,
+        "rhum": -0.1171,
+        "wspd_mph": 0.1717,
+        "wind_cf": 0.0474,
+        "air_density": 0.0733
+      },
+      "OAK": {
+        "temp_f": 0.1391,
+        "rhum": 0.3452,
+        "wspd_mph": -0.0848,
+        "wind_cf": -0.1722,
+        "air_density": -0.233
+      },
+      "PHI": {
+        "temp_f": -0.0459,
+        "rhum": 0.0631,
+        "wspd_mph": 0.0572,
+        "wind_cf": 0.1925,
+        "air_density": 0.1412
+      },
+      "PIT": {
+        "temp_f": 0.0731,
+        "rhum": -0.1635,
+        "wspd_mph": -0.0924,
+        "wind_cf": -0.1267,
+        "air_density": 0.0479
+      },
+      "SD": {
+        "temp_f": -0.0491,
+        "rhum": 0.032,
+        "wspd_mph": -0.0082,
+        "wind_cf": -0.0974,
+        "air_density": 0.0781
+      },
+      "SEA": {
+        "temp_f": -0.037,
+        "rhum": -0.0445,
+        "wspd_mph": -0.0444,
+        "wind_cf": 0.139,
+        "air_density": 0.0219
+      },
+      "SF": {
+        "temp_f": 0.0521,
+        "rhum": 0.0059,
+        "wspd_mph": 0.0116,
+        "wind_cf": -0.0304,
+        "air_density": -0.0787
+      },
+      "STL": {
+        "temp_f": -0.0118,
+        "rhum": 0.0344,
+        "wspd_mph": 0.0237,
+        "wind_cf": 0.0881,
+        "air_density": 0.0638
+      },
+      "TB": {
+        "temp_f": 0.1093,
+        "rhum": 0.1015,
+        "wspd_mph": -0.0331,
+        "wind_cf": 0.1515,
+        "air_density": 0.0043
+      },
+      "TEX": {
+        "temp_f": -0.0525,
+        "rhum": -0.0426,
+        "wspd_mph": 0.1206,
+        "wind_cf": 0.0281,
+        "air_density": 0.1304
+      },
+      "TOR": {
+        "temp_f": -0.0851,
+        "rhum": -0.144,
+        "wspd_mph": 0.1338,
+        "wind_cf": -0.0868,
+        "air_density": 0.0481
+      },
+      "WSH": {
+        "temp_f": -0.0811,
+        "rhum": 0.1267,
+        "wspd_mph": -0.1935,
+        "wind_cf": -0.0588,
+        "air_density": 0.0352
+      }
+    },
+    "model_r2": {
+      "train": 0.0482,
+      "test": 0.0403
+    },
+    "fixed_effects_interpretation": {
+      "temp_f": "Per 1 SD (16.3\u00b0F) increase in temp, strikeouts change by 0.17.",
+      "rhum": "Per 1 SD (26.0%) increase in humidity, strikeouts change by -0.08.",
+      "wspd_mph": "Per 1 SD (4.7 mph) increase in wind speed, strikeouts change by 0.03.",
+      "wind_cf": "Per 1 SD (13.95) increase in wind toward CF, strikeouts change by 0.01.",
+      "air_density": "Per 1 SD (0.0483 kg/m\u00b3) increase in air density, strikeouts change by 0.34.",
+      "elevation_ft": "Per 1 SD (597 ft) increase in elevation, strikeouts change by -0.06.",
+      "is_night": "Night games have -0.23 fewer/more strikeouts than day games.",
+      "marine_layer_day": "Pacific coast day games have 0.03 adjustment to strikeouts.",
+      "marine_layer_night": "Pacific coast night games have 0.08 adjustment to strikeouts."
+    }
+  },
+  "runs": {
+    "fixed_effects": {
+      "Intercept": 4.4248,
+      "temp_f": 0.0717,
+      "rhum": -0.0891,
+      "wspd_mph": 0.071,
+      "wind_cf": 0.1396,
+      "air_density": -0.1449,
+      "is_night": 0.1441,
+      "elevation_ft": 0.0594,
+      "marine_layer_day": -0.0255,
+      "marine_layer_night": -0.1555
+    },
+    "park_effects": {
+      "ARI": -0.0175,
+      "ATL": 0.0126,
+      "BAL": 0.2429,
+      "BOS": 0.2309,
+      "CHC": -0.1724,
+      "CIN": 0.2377,
+      "CLE": -0.2091,
+      "COL": 0.0092,
+      "CWS": 0.0975,
+      "DET": 0.1696,
+      "HOU": -0.1214,
+      "KC": 0.0905,
+      "LAA": 0.2247,
+      "LAD": -0.4406,
+      "MIA": 0.0666,
+      "MIL": -0.1213,
+      "MIN": 0.0786,
+      "NYM": -0.1667,
+      "NYY": -0.1617,
+      "OAK": 0.0781,
+      "PHI": -0.0371,
+      "PIT": 0.0682,
+      "SD": -0.0347,
+      "SEA": -0.0035,
+      "SF": -0.005,
+      "STL": -0.2319,
+      "TB": -0.1506,
+      "TEX": 0.1012,
+      "TOR": 0.0864,
+      "WSH": 0.0785
+    },
+    "park_weather_interactions": {
+      "ARI": {
+        "temp_f": -0.0252,
+        "rhum": 0.0118,
+        "wspd_mph": 0.0864,
+        "wind_cf": -0.0218,
+        "air_density": 0.0099
+      },
+      "ATL": {
+        "temp_f": -0.1166,
+        "rhum": 0.0097,
+        "wspd_mph": 0.083,
+        "wind_cf": 0.0861,
+        "air_density": 0.0622
+      },
+      "BAL": {
+        "temp_f": 0.0857,
+        "rhum": 0.0577,
+        "wspd_mph": -0.0958,
+        "wind_cf": 0.0878,
+        "air_density": -0.0049
+      },
+      "BOS": {
+        "temp_f": -0.011,
+        "rhum": -0.1426,
+        "wspd_mph": -0.002,
+        "wind_cf": 0.1276,
+        "air_density": 0.0587
+      },
+      "CHC": {
+        "temp_f": 0.0343,
+        "rhum": 0.0263,
+        "wspd_mph": 0.0287,
+        "wind_cf": 0.2008,
+        "air_density": -0.0303
+      },
+      "CIN": {
+        "temp_f": 0.0221,
+        "rhum": 0.0978,
+        "wspd_mph": 0.0406,
+        "wind_cf": 0.0196,
+        "air_density": -0.0507
+      },
+      "CLE": {
+        "temp_f": 0.0193,
+        "rhum": -0.0786,
+        "wspd_mph": -0.0438,
+        "wind_cf": 0.0282,
+        "air_density": 0.0315
+      },
+      "COL": {
+        "temp_f": -0.0107,
+        "rhum": -0.0701,
+        "wspd_mph": -0.0589,
+        "wind_cf": -0.0831,
+        "air_density": -0.0255
+      },
+      "CWS": {
+        "temp_f": -0.0351,
+        "rhum": -0.013,
+        "wspd_mph": -0.004,
+        "wind_cf": -0.0506,
+        "air_density": 0.0185
+      },
+      "DET": {
+        "temp_f": 0.0334,
+        "rhum": 0.0429,
+        "wspd_mph": -0.0231,
+        "wind_cf": -0.0666,
+        "air_density": -0.0538
+      },
+      "HOU": {
+        "temp_f": -0.0287,
+        "rhum": -0.0589,
+        "wspd_mph": -0.0894,
+        "wind_cf": -0.0651,
+        "air_density": 0.0146
+      },
+      "KC": {
+        "temp_f": 0.0291,
+        "rhum": -0.0192,
+        "wspd_mph": 0.1087,
+        "wind_cf": 0.0127,
+        "air_density": -0.0577
+      },
+      "LAA": {
+        "temp_f": -0.031,
+        "rhum": -0.0258,
+        "wspd_mph": -0.0596,
+        "wind_cf": 0.0765,
+        "air_density": 0.0673
+      },
+      "LAD": {
+        "temp_f": -0.0233,
+        "rhum": 0.1195,
+        "wspd_mph": 0.0531,
+        "wind_cf": -0.2331,
+        "air_density": 0.0964
+      },
+      "MIA": {
+        "temp_f": 0.0451,
+        "rhum": -0.0179,
+        "wspd_mph": 0.0749,
+        "wind_cf": 0.0168,
+        "air_density": -0.0162
+      },
+      "MIL": {
+        "temp_f": -0.0445,
+        "rhum": -0.0347,
+        "wspd_mph": 0.0102,
+        "wind_cf": 0.0561,
+        "air_density": 0.0446
+      },
+      "MIN": {
+        "temp_f": 0.0879,
+        "rhum": 0.0484,
+        "wspd_mph": 0.0684,
+        "wind_cf": 0.0695,
+        "air_density": -0.1125
+      },
+      "NYM": {
+        "temp_f": 0.0307,
+        "rhum": -0.0494,
+        "wspd_mph": 0.0017,
+        "wind_cf": -0.0199,
+        "air_density": -0.0878
+      },
+      "NYY": {
+        "temp_f": 0.0334,
+        "rhum": 0.0843,
+        "wspd_mph": -0.0049,
+        "wind_cf": -0.0416,
+        "air_density": -0.0819
+      },
+      "OAK": {
+        "temp_f": -0.0976,
+        "rhum": -0.067,
+        "wspd_mph": 0.0037,
+        "wind_cf": -0.0406,
+        "air_density": 0.1035
+      },
+      "PHI": {
+        "temp_f": -0.0042,
+        "rhum": -0.0625,
+        "wspd_mph": 0.019,
+        "wind_cf": -0.0143,
+        "air_density": -0.0051
+      },
+      "PIT": {
+        "temp_f": 0.0365,
+        "rhum": 0.0147,
+        "wspd_mph": -0.0417,
+        "wind_cf": 0.0955,
+        "air_density": -0.0562
+      },
+      "SD": {
+        "temp_f": -0.0122,
+        "rhum": -0.0308,
+        "wspd_mph": 0.0617,
+        "wind_cf": 0.0553,
+        "air_density": 0.006
+      },
+      "SEA": {
+        "temp_f": -0.0284,
+        "rhum": 0.067,
+        "wspd_mph": -0.0604,
+        "wind_cf": -0.0327,
+        "air_density": -0.0004
+      },
+      "SF": {
+        "temp_f": 0.0215,
+        "rhum": -0.0257,
+        "wspd_mph": -0.0801,
+        "wind_cf": -0.0414,
+        "air_density": -0.0198
+      },
+      "STL": {
+        "temp_f": -0.0048,
+        "rhum": 0.033,
+        "wspd_mph": 0.0243,
+        "wind_cf": 0.0781,
+        "air_density": -0.0046
+      },
+      "TB": {
+        "temp_f": -0.0688,
+        "rhum": 0.0179,
+        "wspd_mph": -0.0903,
+        "wind_cf": 0.0186,
+        "air_density": 0.0129
+      },
+      "TEX": {
+        "temp_f": 0.1088,
+        "rhum": -0.0076,
+        "wspd_mph": 0.0041,
+        "wind_cf": -0.0835,
+        "air_density": -0.1111
+      },
+      "TOR": {
+        "temp_f": -0.0421,
+        "rhum": 0.0073,
+        "wspd_mph": 0.0781,
+        "wind_cf": -0.0718,
+        "air_density": 0.0508
+      },
+      "WSH": {
+        "temp_f": 0.0681,
+        "rhum": -0.0235,
+        "wspd_mph": -0.0215,
+        "wind_cf": -0.0233,
+        "air_density": -0.0034
+      }
+    },
+    "model_r2": {
+      "train": 0.0259,
+      "test": 0.0226
+    },
+    "fixed_effects_interpretation": {
+      "temp_f": "Per 1 SD (16.3\u00b0F) increase in temp, runs change by 0.07.",
+      "rhum": "Per 1 SD (26.0%) increase in humidity, runs change by -0.09.",
+      "wspd_mph": "Per 1 SD (4.7 mph) increase in wind speed, runs change by 0.07.",
+      "wind_cf": "Per 1 SD (13.95) increase in wind toward CF, runs change by 0.14.",
+      "air_density": "Per 1 SD (0.0483 kg/m\u00b3) increase in air density, runs change by -0.14.",
+      "elevation_ft": "Per 1 SD (597 ft) increase in elevation, runs change by 0.06.",
+      "is_night": "Night games have 0.14 fewer/more runs than day games.",
+      "marine_layer_day": "Pacific coast day games have -0.03 adjustment to runs.",
+      "marine_layer_night": "Pacific coast night games have -0.16 adjustment to runs."
+    }
+  }
+}

@@ -80,6 +80,21 @@ TEAM_FILE_TO_ABBREV = {
     'white_sox': 'CWS', 'yankee': 'NYY',
 }
 
+# Team name (from elevation.csv) to team code mapping
+TEAM_NAME_TO_CODE = {
+    'Rockies': 'COL', 'Athletics': 'OAK', 'Tigers': 'DET', 'Dodgers': 'LAD',
+    'Blue Jays': 'TOR', 'Red Sox': 'BOS', 'Orioles': 'BAL', 'D-backs': 'ARI',
+    'Phillies': 'PHI', 'Rays': 'TB', 'Nationals': 'WSH', 'Twins': 'MIN',
+    'Braves': 'ATL', 'Angels': 'LAA', 'Reds': 'CIN', 'Yankees': 'NYY',
+    'Giants': 'SF', 'Mets': 'NYM', 'Cubs': 'CHC', 'White Sox': 'CWS',
+    'Brewers': 'MIL', 'Marlins': 'MIA', 'Astros': 'HOU', 'Royals': 'KC',
+    'Cardinals': 'STL', 'Pirates': 'PIT', 'Guardians': 'CLE', 'Padres': 'SD',
+    'Rangers': 'TEX', 'Mariners': 'SEA',
+}
+
+# Pacific coast parks with marine layer influence (fog/cool moist air)
+MARINE_LAYER_PARKS = ['SF', 'OAK', 'SD', 'LAA', 'LAD', 'SEA']
+
 WEATHER_FEATURES_BASIC = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density']
 WEATHER_FEATURES_ENHANCED = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density', 'heat_index']
 WEATHER_FEATURES_FULL = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density', 'heat_index', 'elevation_ft', 'has_roof']
@@ -104,6 +119,35 @@ def load_stadium_parameters(params_path: str = None) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
     return params_df.set_index('team_code')
+
+
+def load_elevation_data(elevation_path: str = None) -> Dict[str, float]:
+    """Load elevation data from elevation.csv and return dict mapping team_code -> elevation_ft.
+
+    Uses data/elevation.csv as the authoritative source for stadium elevations.
+    """
+    if elevation_path is None:
+        for p in [Path(__file__).parent.parent / 'data' / 'elevation.csv',
+                  Path('data/elevation.csv'), Path('../data/elevation.csv')]:
+            if p.exists():
+                elevation_path = p
+                break
+        if elevation_path is None:
+            raise FileNotFoundError("Could not find elevation.csv")
+
+    df = pd.read_csv(elevation_path)
+    elevation_map = {}
+    for _, row in df.iterrows():
+        team_name = row['Team']
+        if team_name in TEAM_NAME_TO_CODE:
+            elevation_map[TEAM_NAME_TO_CODE[team_name]] = row['Elevation (Feet)']
+
+    # Store league average for reference
+    if 'League' in df['Team'].values:
+        league_row = df[df['Team'] == 'League']
+        elevation_map['_league_avg'] = league_row['Elevation (Feet)'].values[0]
+
+    return elevation_map
 
 
 def add_enhanced_weather_features(df: pd.DataFrame, stadium_params: pd.DataFrame = None) -> pd.DataFrame:
@@ -484,7 +528,9 @@ def prepare_park_weather_interactions(df: pd.DataFrame, weather_features: List[s
                                         standardize: bool = True, test_start_season: int = 2023,
                                         scaler_type: str = 'robust', split_method: str = 'season',
                                         test_size: float = 0.30, random_state: int = 42,
-                                        include_roof_interactions: bool = False) -> Dict:
+                                        include_roof_interactions: bool = False,
+                                        include_elevation: bool = False,
+                                        include_marine_layer: bool = False) -> Dict:
     """Prepare data for Ridge/Lasso regression with explicit park × weather interactions."""
     data = df.copy()
     required_cols = weather_features + [TARGET_STRIKEOUTS, TARGET_RUNS, 'day_night', 'home_team', 'season']
@@ -519,13 +565,39 @@ def prepare_park_weather_interactions(df: pd.DataFrame, weather_features: List[s
             warnings.warn("Could not load stadium parameters.")
             include_roof_interactions = False
 
+    # Add elevation feature (v6)
+    elevation_features = []
+    elevation_map = None
+    if include_elevation:
+        try:
+            elevation_map = load_elevation_data()
+            for df_split in [df_train, df_test]:
+                df_split['elevation_ft'] = df_split['home_team'].map(elevation_map).fillna(
+                    elevation_map.get('_league_avg', 512.6))
+            elevation_features = ['elevation_ft']
+        except FileNotFoundError:
+            warnings.warn("Could not load elevation data.")
+            include_elevation = False
+
+    # Add marine layer features (v6)
+    marine_layer_features = []
+    if include_marine_layer:
+        for df_split in [df_train, df_test]:
+            df_split['is_marine_layer'] = df_split['home_team'].isin(MARINE_LAYER_PARKS).astype(int)
+            df_split['is_day'] = 1 - df_split['is_night']
+            # Marine layer × day/night interactions
+            df_split['marine_layer_day'] = df_split['is_marine_layer'] * df_split['is_day']
+            df_split['marine_layer_night'] = df_split['is_marine_layer'] * df_split['is_night']
+        marine_layer_features = ['marine_layer_day', 'marine_layer_night']
+
     weather_scaler, scaling_params = None, {}
+    features_to_scale = weather_features + elevation_features  # Elevation is scaled like weather features
     if standardize:
         weather_scaler = RobustScaler() if scaler_type == 'robust' else StandardScaler()
-        df_train[weather_features] = weather_scaler.fit_transform(df_train[weather_features])
-        df_test[weather_features] = weather_scaler.transform(df_test[weather_features])
+        df_train[features_to_scale] = weather_scaler.fit_transform(df_train[features_to_scale])
+        df_test[features_to_scale] = weather_scaler.transform(df_test[features_to_scale])
         attr = 'center_' if scaler_type == 'robust' else 'mean_'
-        for i, feat in enumerate(weather_features):
+        for i, feat in enumerate(features_to_scale):
             scaling_params[feat] = {'center': getattr(weather_scaler, attr)[i], 'scale': weather_scaler.scale_[i]}
 
     park_dummies = [f'park_{p}' for p in parks]
@@ -553,7 +625,10 @@ def prepare_park_weather_interactions(df: pd.DataFrame, weather_features: List[s
     df_test = pd.concat([df_test, pd.DataFrame(test_park, index=df_test.index),
                          pd.DataFrame(test_interactions, index=df_test.index)], axis=1)
 
-    feature_names = weather_features + ['is_night'] + roof_features + park_dummies + interaction_features + roof_interaction_features
+    # Build feature list: weather + elevation + is_night + marine_layer + roof + park_dummies + interactions
+    feature_names = (weather_features + elevation_features + ['is_night'] +
+                     marine_layer_features + roof_features + park_dummies +
+                     interaction_features + roof_interaction_features)
 
     print(f"Park-Weather Interactions: {len(df_train)} train, {len(df_test)} test, {len(feature_names)} features")
     return {
@@ -563,11 +638,14 @@ def prepare_park_weather_interactions(df: pd.DataFrame, weather_features: List[s
         'y_test_strikeouts': df_test[TARGET_STRIKEOUTS].values,
         'y_train_runs': df_train[TARGET_RUNS].values, 'y_test_runs': df_test[TARGET_RUNS].values,
         'feature_names': feature_names, 'weather_features': weather_features,
+        'elevation_features': elevation_features, 'marine_layer_features': marine_layer_features,
         'park_dummies': park_dummies, 'interaction_features': interaction_features,
         'roof_features': roof_features, 'roof_interaction_features': roof_interaction_features,
         'weather_scaler': weather_scaler, 'scaling_params': scaling_params,
         'scaler_type': scaler_type if standardize else None, 'parks': parks,
         'target_strikeouts': TARGET_STRIKEOUTS, 'target_runs': TARGET_RUNS, 'split_info': split_info,
+        'elevation_map': elevation_map if include_elevation else None,
+        'marine_layer_parks': MARINE_LAYER_PARKS if include_marine_layer else None,
     }
 
 
