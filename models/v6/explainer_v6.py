@@ -313,7 +313,8 @@ class PredictionExplainerV6(PredictionExplainer):
         """
         Extended dashboard API with component breakdown.
 
-        Adds v6-specific fields to the standard dashboard output.
+        Adds v6-specific fields to the standard dashboard output, including
+        elevation and marine layer in the factors list and waterfall chart.
         """
         # Get base dashboard output
         result = self.explain_for_dashboard(
@@ -333,6 +334,50 @@ class PredictionExplainerV6(PredictionExplainer):
         elevation = self.get_elevation_contribution(park, weather, target)
         marine_layer = self.get_marine_layer_contribution(park, weather, target)
 
+        target_unit = 'K' if target == 'strikeouts' else 'R'
+
+        # Create elevation factor
+        elev_contribution = elevation['elevation_contribution']
+        elev_direction = 'positive' if elev_contribution > 0.01 else ('negative' if elev_contribution < -0.01 else 'neutral')
+        elevation_factor = {
+            'id': 'elevation',
+            'label': 'Elevation',
+            'description': f"Elevation ({elevation['elevation_ft']:.0f} ft) contributes {elev_contribution:+.2f} {target_unit}",
+            'contribution': round(elev_contribution, 3),
+            'direction': elev_direction,
+            'raw_value': round(elevation['elevation_ft'], 0),
+            'deviation': round(elevation['elevation_deviation'], 0),
+        }
+
+        # Create marine layer factor
+        ml_contribution = marine_layer['total_marine_layer_contribution']
+        ml_direction = 'positive' if ml_contribution > 0.01 else ('negative' if ml_contribution < -0.01 else 'neutral')
+        if marine_layer['is_marine_layer_park']:
+            time_desc = "night" if is_night else "day"
+            ml_description = f"Marine layer ({time_desc}) contributes {ml_contribution:+.2f} {target_unit}"
+        else:
+            ml_description = f"No marine layer effect (not a coastal park)"
+        marine_layer_factor = {
+            'id': 'marine_layer',
+            'label': 'Marine Layer',
+            'description': ml_description,
+            'contribution': round(ml_contribution, 3),
+            'direction': ml_direction,
+        }
+
+        # Insert elevation after air_density, marine_layer after day_night
+        new_factors = []
+        for factor in result['factors']:
+            new_factors.append(factor)
+            if factor['id'] == 'air_density':
+                new_factors.append(elevation_factor)
+            elif factor['id'] == 'day_night':
+                new_factors.append(marine_layer_factor)
+        result['factors'] = new_factors
+
+        # Rebuild waterfall with v6 factors
+        result['waterfall'] = self._build_waterfall_v6(result, components)
+
         # Update result with v6 fields
         result['meta']['version'] = '6.0.0'
         result['components'] = components['components']
@@ -347,7 +392,49 @@ class PredictionExplainerV6(PredictionExplainer):
             'interpretation': marine_layer['interpretation'],
         }
 
+        # Update prediction to use v6 model value
+        result['prediction']['value'] = round(components['components']['total_prediction'], 2)
+        result['prediction']['delta'] = round(
+            components['components']['total_prediction'] - result['prediction']['baseline'], 2
+        )
+
         return result
+
+    def _build_waterfall_v6(self, result: Dict, components: Dict) -> Dict:
+        """Build waterfall chart data including v6 factors."""
+        baseline = result['prediction']['baseline']
+        prediction = components['components']['total_prediction']
+
+        bars = [{'id': 'baseline', 'label': 'League Baseline', 'start': 0,
+                 'end': round(baseline, 3), 'type': 'baseline'}]
+
+        current = baseline
+        for factor in result['factors']:
+            if factor['id'] != 'park' and abs(factor['contribution']) > 0.001:
+                bars.append({
+                    'id': factor['id'],
+                    'label': factor['label'],
+                    'start': round(current, 3),
+                    'end': round(current + factor['contribution'], 3),
+                    'type': 'positive' if factor['contribution'] > 0 else 'negative'
+                })
+                current += factor['contribution']
+
+        # Add park effect
+        park_factor = next((f for f in result['factors'] if f['id'] == 'park'), None)
+        if park_factor and abs(park_factor['contribution']) > 0.001:
+            bars.append({
+                'id': 'park',
+                'label': park_factor['label'],
+                'start': round(current, 3),
+                'end': round(current + park_factor['contribution'], 3),
+                'type': 'positive' if park_factor['contribution'] > 0 else 'negative'
+            })
+
+        bars.append({'id': 'total', 'label': 'Prediction', 'start': 0,
+                     'end': round(prediction, 3), 'type': 'total'})
+
+        return {'bars': bars}
 
 
 def main():
