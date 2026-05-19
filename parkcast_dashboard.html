@@ -245,6 +245,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const STADIUMS = [
   { abbr:'ARI', name:'Chase Field',              team:'Diamondbacks', city:'Phoenix, AZ',        roof:true,  orientation:270,
@@ -603,8 +604,53 @@ let activeStadium = 24; // Oracle Park
 let projections  = null;
 let stadiumRows  = null; // real CSV rows for active stadium, null = use placeholder
 let stadiumPhoto = null; // base64 data URL for park photo, null = show placeholder
+let pfData       = null; // { teamName: { '2021': pf, ... } } from Annual Park Factor.xlsx
 let currentPage  = 1;
 let dayNight     = 'day';
+
+const ABBR_TO_PF_TEAM = {
+  ARI:'D-backs',    ATL:'Braves',      BAL:'Orioles',   BOS:'Red Sox',
+  CHC:'Cubs',       CIN:'Reds',        CLE:'Guardians', COL:'Rockies',
+  CWS:'White Sox',  DET:'Tigers',      HOU:'Astros',    KC:'Royals',
+  LAA:'Angels',     LAD:'Dodgers',     MIA:'Marlins',   MIL:'Brewers',
+  MIN:'Twins',      NYM:'Mets',        NYY:'Yankees',   OAK:'Athletics',
+  PHI:'Phillies',   PIT:'Pirates',     SD:'Padres',     SEA:'Mariners',
+  SF:'Giants',      STL:'Cardinals',   TB:'Rays',       TEX:'Rangers',
+  TOR:'Blue Jays',  WSH:'Nationals',
+};
+
+async function fetchParkFactorData() {
+  if (pfData) return pfData;
+  const pat = getPAT();
+  if (!pat) return null;
+  try {
+    const res = await fetch(
+      'https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/data/Annual%20Park%20Factor.xlsx',
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const binary = atob(json.content.replace(/\n/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const wb = XLSX.read(bytes, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    pfData = {};
+    rows.forEach(row => {
+      const team = row['Team'];
+      if (!team) return;
+      pfData[team] = {};
+      ['2021','2022','2023','2024','2025'].forEach(yr => {
+        if (row[yr] !== undefined) pfData[team][yr] = +row[yr];
+      });
+    });
+    return pfData;
+  } catch(e) {
+    console.error('[ParkCast] park factor fetch error:', e);
+    return null;
+  }
+}
 
 function setDayNight(val) {
   dayNight = val;
@@ -886,10 +932,11 @@ async function runModel() {
   const stadium = STADIUMS[activeStadium];
   projections = computeProjection(wx, stadium);
 
-  // Fetch data and photo in parallel
+  // Fetch data, photo, and park factor Excel in parallel
   [stadiumRows, stadiumPhoto] = await Promise.all([
     fetchStadiumData(stadium.abbr),
     fetchStadiumPhoto(stadium.abbr),
+    fetchParkFactorData(),
   ]);
   renderMain();
 }
@@ -989,11 +1036,12 @@ function renderMain() {
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">Predicted vs. Historical Park Factor</div>
-        <div class="panel-tag">${stadiumRows ? '2020–2025 · real game data' : ''}</div>
+        <div class="panel-tag">${pfData ? '2021–2025 · Annual Park Factor' : ''}</div>
       </div>
       <div class="chart-area" style="height:240px;">
         <canvas id="pf-chart"></canvas>
       </div>
+      <div id="pf-hist-table" style="margin-top:12px;"></div>
     </div>
 
     <!-- RUNS + K ROW -->
@@ -1154,6 +1202,7 @@ function renderMain() {
 
   if (currentPage === 1) {
     renderParkFactorChart(p);
+    renderParkFactorTable(p);
     renderAnalogTable(wx);
     renderPage1WeatherHists(wx);
   }
@@ -1235,10 +1284,6 @@ function buildInputTable(wx, stadium, p) {
     <td class="td-mono ${rNight >= 0 ? 'coef-pos' : 'coef-neg'}">${rNight >= 0 ? '+' : ''}${rNight.toFixed(3)}</td>
     <td class="td-mono ${kNight >= 0 ? 'coef-pos' : 'coef-neg'}">${kNight >= 0 ? '+' : ''}${kNight.toFixed(3)}</td>
   </tr>
-  <tr>
-    <td colspan="5" style="font-size:9px;color:var(--text2);font-style:italic;padding-bottom:6px;line-height:1.4;">
-      This coefficient is estimated holding weather constant — it captures residual day/night effects (lighting, crowd, routine). Real-world night games are also typically colder and windier; use the sliders to reflect those conditions for the full picture.
-    </td>
   </tr>`;
   // Total row — exact delta from model
   const rD = p.runsDelta;
@@ -1514,32 +1559,15 @@ function renderParkFactorChart(p) {
 
   let labels, histData, isReal = false;
 
-  if (stadiumRows && stadiumRows.length > 0) {
-    // ── Real data: aggregate by year ───────────────────────────
-    const yearMap = {};
-    stadiumRows.forEach(r => {
-      const yr = r.season || (r.game_date || '').slice(0, 4);
-      if (!yr) return;
-      const awayRuns = parseFloat(r.away_runs_scored);
-      const homeRuns = parseFloat(r.home_runs_scored);
-      if (isNaN(awayRuns) || isNaN(homeRuns)) return;
-      if (!yearMap[yr]) yearMap[yr] = { away: [], home: [] };
-      yearMap[yr].away.push(awayRuns);
-      yearMap[yr].home.push(homeRuns);
-    });
-
-    // Overall average away runs as baseline
-    const allAway = stadiumRows.map(r => parseFloat(r.away_runs_scored)).filter(v => !isNaN(v));
-    const baseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
-
-    labels   = Object.keys(yearMap).sort();
-    histData = labels.map(yr => {
-      const avg = yearMap[yr].away.reduce((a, b) => a + b, 0) / yearMap[yr].away.length;
-      return +((avg / baseline) * 100).toFixed(1);
-    });
-    isReal = true;
+  // ── Prefer Annual Park Factor.xlsx data ──────────────────────
+  const teamName = ABBR_TO_PF_TEAM[STADIUMS[activeStadium].abbr];
+  const teamPF   = pfData && teamName && pfData[teamName];
+  if (teamPF && Object.keys(teamPF).length > 0) {
+    labels   = Object.keys(teamPF).sort();
+    histData = labels.map(yr => teamPF[yr]);
+    isReal   = true;
   } else {
-    // No real data loaded — render empty chart
+    // No Excel data loaded — render empty chart
     labels   = [];
     histData = [];
   }
@@ -1589,7 +1617,35 @@ function renderParkFactorChart(p) {
           }
         });
       }
-      
+
+function renderParkFactorTable(p) {
+  const container = document.getElementById('pf-hist-table');
+  if (!container) return;
+  const teamName = ABBR_TO_PF_TEAM[STADIUMS[activeStadium].abbr];
+  const teamPF = pfData && teamName && pfData[teamName];
+  if (!teamPF || Object.keys(teamPF).length === 0) { container.innerHTML = ''; return; }
+  const years = ['2021','2022','2023','2024','2025'].filter(yr => teamPF[yr] !== undefined);
+  const rows = years.map(yr => {
+    const hist = teamPF[yr];
+    const diff = +(hist - p.parkFactor).toFixed(1);
+    const color = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--text2)';
+    return `<tr>
+      <td class="td-mono">${yr}</td>
+      <td class="td-mono">${hist}</td>
+      <td class="td-mono" style="color:${color}">${diff >= 0 ? '+' : ''}${diff}</td>
+    </tr>`;
+  }).join('');
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Year</th>
+        <th>Historical PF</th>
+        <th>vs. Today's Prediction (${p.parkFactor})</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function renderPage1WeatherHists(wx) {
   const makeHist = (canvasId, labels, counts, currentBinIdx, color, xLabel, yLabel) => {
     const canvas = document.getElementById(canvasId);
