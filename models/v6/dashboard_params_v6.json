@@ -67,17 +67,8 @@
       "TOR": 300.0,
       "WSH": 35.0
     },
-    "roofed_stadiums": [
-      "ARI",
-      "HOU",
-      "MIA",
-      "MIL",
-      "SEA",
-      "TB",
-      "TEX",
-      "TOR"
-    ],
-    "new_in_v6": "Added elevation_ft as fixed effect and marine_layer \u00d7 day/night interactions.",
+    "roofed_stadiums_note": "v6 does NOT apply roof/dome dampening. We lack data on roof open/closed status, so weather effects are always applied as modeled.",
+    "new_in_v6": "Added elevation_ft as fixed effect and marine_layer \u00d7 day/night interactions. Removed roof dampening factor (no data on roof status).",
     "n_interaction_terms": 150,
     "optimal_alpha": 596.3623,
     "performance_notes": {

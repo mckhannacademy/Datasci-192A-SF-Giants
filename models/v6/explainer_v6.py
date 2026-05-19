@@ -309,18 +309,22 @@ class PredictionExplainerV6(PredictionExplainer):
 
     def explain_for_dashboard_v6(self, park: str, temp_f: float, humidity: float, wind_speed: float,
                                   wind_direction_cf: float, is_night: bool, target: str = 'strikeouts',
-                                  baseline_type: str = 'league', dome_closed: bool = True) -> Dict[str, Any]:
+                                  baseline_type: str = 'league') -> Dict[str, Any]:
         """
         Extended dashboard API with component breakdown.
 
         Adds v6-specific fields to the standard dashboard output, including
         elevation and marine layer in the factors list and waterfall chart.
+
+        Note: v6 does NOT apply roof/dome dampening. We don't have data on whether
+        roofs are open or closed, so weather effects are always applied as modeled.
         """
-        # Get base dashboard output
+        # Get base dashboard output - always pass dome_closed=False to prevent
+        # the parent class from zeroing weather effects for dome parks
         result = self.explain_for_dashboard(
             park=park, temp_f=temp_f, humidity=humidity, wind_speed=wind_speed,
             wind_direction_cf=wind_direction_cf, is_night=is_night, target=target,
-            baseline_type=baseline_type, dome_closed=dome_closed
+            baseline_type=baseline_type, dome_closed=False  # v6: no roof dampening
         )
 
         # Get component breakdown
@@ -380,6 +384,7 @@ class PredictionExplainerV6(PredictionExplainer):
 
         # Update result with v6 fields
         result['meta']['version'] = '6.0.0'
+        result['meta'].pop('dome_closed', None)  # v6 doesn't use roof dampening
         result['components'] = components['components']
         result['elevation'] = {
             'elevation_ft': elevation['elevation_ft'],

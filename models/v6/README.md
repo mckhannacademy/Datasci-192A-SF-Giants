@@ -176,6 +176,7 @@ The v6 explainer groups contributions into three categories:
 3. Updated `data_prep.py` with `include_elevation` and `include_marine_layer` options
 4. New `explain_components()` method for grouped contribution breakdown
 5. New `get_elevation_contribution()` and `get_marine_layer_contribution()` methods
+6. **Removed roof/dome dampening** - We don't have data on whether roofs are open or closed, so weather effects are always applied as modeled for all parks including dome stadiums
 
 ## Verification
 

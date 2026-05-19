@@ -126,8 +126,10 @@ def train_v6_models(data_dir: Path = None, output_path: Path = None):
             'elevation_description': 'Stadium elevation in feet. Higher elevation = thinner air = '
                                      'balls travel farther (more runs) but may not affect strikeouts as much.',
             'elevation_by_park': elevation_by_park,
-            'roofed_stadiums': ['ARI', 'HOU', 'MIA', 'MIL', 'SEA', 'TB', 'TEX', 'TOR'],
-            'new_in_v6': 'Added elevation_ft as fixed effect and marine_layer × day/night interactions.',
+            'roofed_stadiums_note': 'v6 does NOT apply roof/dome dampening. We lack data on roof open/closed '
+                                    'status, so weather effects are always applied as modeled.',
+            'new_in_v6': 'Added elevation_ft as fixed effect and marine_layer × day/night interactions. '
+                         'Removed roof dampening factor (no data on roof status).',
         },
         'scaling': data['scaling_params'],
     }
