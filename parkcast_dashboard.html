@@ -46,10 +46,6 @@
   .stadium-city { font-size: 11px; color: var(--text2); }
   .stadium-roof { font-size: 10px; background: rgba(61,127,255,0.15); color: var(--accent); border-radius: 3px; padding: 1px 5px; font-family: var(--font-m); flex-shrink: 0; }
 
-  .date-block { display: flex; flex-direction: column; gap: 6px; }
-  .date-block label { font-size: 11px; color: var(--text2); letter-spacing: 0.05em; }
-  .date-block input[type="date"], .date-block select { background: var(--bg3); border: 1px solid var(--line2); color: var(--text0); padding: 7px 10px; border-radius: 6px; font-family: var(--font-b); font-size: 12px; width: 100%; cursor: pointer; }
-  .date-block input[type="date"]:focus, .date-block select:focus { outline: none; border-color: var(--accent); }
 
   .weather-inputs { display: flex; flex-direction: column; gap: 10px; }
   .wx-row { display: flex; flex-direction: column; gap: 4px; }
@@ -115,7 +111,8 @@
   .section-divider-line { flex: 1; height: 1px; background: var(--line2); }
 
   .dist-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; min-width: 0; }
-  .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
+  .dist-row.dist-row-2 { grid-template-columns: repeat(2, 1fr); }
+  .dist-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px 5px; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
   .dist-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text2); }
   .dist-stats { display: flex; justify-content: space-between; }
   .dist-stat { display: flex; flex-direction: column; gap: 2px; }
@@ -182,7 +179,7 @@
     <div class="topbar-label">MLB Weather Performance Intelligence</div>
     <div class="topbar-right">
       <div class="status-dot"></div>
-      <div class="status-label">Model v1.0 — OLS + Park FE</div>
+      <div class="status-label">Model v5.0 — Ridge + Park FE</div>
       <div class="topbar-divider"></div>
       <button class="page-btn active" id="btn-page1" onclick="setPage(1)">&#9650; Projections</button>
       <button class="page-btn" id="btn-page2" onclick="setPage(2)">&#128202; Analysis</button>
@@ -192,30 +189,12 @@
     <!-- EDIT 2: Sidebar reordered — inputs/run button ABOVE stadium search/list -->
     <div class="sidebar">
  
-      <!-- DATE & GAME TIME -->
-      <div class="date-block">
-        <div class="sidebar-section-label">Date &amp; Game Time</div>
-        <label>Game Date</label>
-        <input type="date" id="game-date" value="2025-07-15">
-        <label>First Pitch</label>
-        <select id="game-time">
-          <option value="13">1:05 PM</option>
-          <option value="16" selected>4:05 PM</option>
-          <option value="19">7:05 PM</option>
-          <option value="20">8:05 PM</option>
-        </select>
-      </div>
- 
       <!-- WEATHER INPUTS -->
       <div class="weather-inputs">
-        <div class="sidebar-section-label">Weather at First Pitch</div>
+        <div class="sidebar-section-label">Weather Conditions</div>
         <div class="wx-row">
           <label>Temperature (°F) <span id="temp-val">72</span></label>
           <input type="range" min="20" max="105" value="72" id="wx-temp" oninput="updateWx()">
-        </div>
-        <div class="wx-row">
-          <label>Humidity (%) <span id="hum-val">55</span></label>
-          <input type="range" min="0" max="100" value="55" id="wx-hum" oninput="updateWx()">
         </div>
         <div class="wx-row">
           <label>Wind Speed (mph) <span id="wind-val">12</span></label>
@@ -226,8 +205,8 @@
           <input type="range" min="0" max="315" step="45" value="225" id="wx-winddir" oninput="updateWx()">
         </div>
         <div class="wx-row">
-          <label>Pressure (inHg) <span id="press-val">29.92</span></label>
-          <input type="range" min="2890" max="3050" value="2992" id="wx-press" oninput="updateWx()">
+          <label>Humidity (%) <span id="rhum-val">60</span></label>
+          <input type="range" min="0" max="100" value="60" id="wx-rhum" oninput="updateWx()">
         </div>
       </div>
  
@@ -240,11 +219,9 @@
         </div>
       </div>
  
-      <!-- GITHUB PAT -->
+      <!-- DATA STATUS -->
       <div class="pat-wrap">
-        <div class="sidebar-section-label">GitHub Access</div>
-        <input class="pat-input" type="password" id="gh-pat" placeholder="Paste GitHub PAT…" oninput="onPatInput()">
-        <div class="pat-status idle" id="pat-status">No token — using placeholder data</div>
+        <div class="pat-status idle" id="pat-status">Click Run Projection to load data</div>
       </div>
  
       <!-- RUN BUTTON -->
@@ -266,6 +243,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const STADIUMS = [
   { abbr:'ARI', name:'Chase Field',              team:'Diamondbacks', city:'Phoenix, AZ',        roof:true,  orientation:270,
@@ -334,7 +312,6 @@ const STADIUMS = [
 const MLB_TEAMS = ['ARI','ATL','BAL','BOS','CHC','CIN','CLE','COL','CWS','DET','HOU','KC','LAA','LAD','MIA','MIL','MIN','NYM','NYY','OAK','PHI','PIT','SD','SEA','SF','STL','TB','TEX','TOR','WSH'];
 
 // ── GitHub data layer ─────────────────────────────────────────────
-const GH_API_BASE = 'https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/data';
 const TEAM_SLUG = {
   ARI:'dbacks',       ATL:'braves',    BAL:'orioles',   BOS:'fenway',
   CHC:'cubs',         CIN:'reds',      CLE:'guardians', COL:'rockies',
@@ -362,49 +339,32 @@ const HEATMAP_CACHE = {};
 // Folders use the CSV abbreviation convention (ATH, AZ, etc.)
 const FOLDER_ABBR = { ARI:'AZ', OAK:'ATH' }; // everything else matches directly
 
-async function fetchHeatmapImages(abbr) {
-  if (HEATMAP_CACHE[abbr]) return HEATMAP_CACHE[abbr];
-  const pat = getPAT();
-  if (!pat) return null;
-
+function fetchHeatmapImages(abbr) {
+  if (HEATMAP_CACHE[abbr]) return Promise.resolve(HEATMAP_CACHE[abbr]);
   const folder = FOLDER_ABBR[abbr] || abbr;
-  const variables = ['temp_f', 'pres', 'rhum', 'wspd_mph'];
   const fileNames = {
-    temp_f:   'heatmap_temp_f_diff.png',
-    pres:     'heatmap_pres_diff.png',
-    rhum:     'heatmap_rhum_diff.png',
-    wspd_mph: 'heatmap_wspd_mph_diff.png',
+    temp_f:   'heatmap_temp_f_diff_ci.png',
+    pres:     'heatmap_pres_diff_ci.png',
+    rhum:     'heatmap_rhum_diff_ci.png',
+    wspd_mph: 'heatmap_wspd_mph_diff_ci.png',
   };
-
   const result = {};
-  for (const variable of variables) {
-    const path = `analysis/cleaned_analysis/${folder}/${fileNames[variable]}`;
-    try {
-      const res = await fetch(
-        `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
-        { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
-      );
-      if (!res.ok) { result[variable] = null; continue; }
-      const json = await res.json();
-      result[variable] = `data:image/png;base64,${json.content.replace(/\n/g, '')}`;
-    } catch(e) {
-      result[variable] = null;
-    }
+  for (const [variable, fileName] of Object.entries(fileNames)) {
+    const path = `analysis/cleaned_analysis_diff_ci/${folder}/${fileName}`;
+    result[variable] = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/${path}`;
   }
-
   HEATMAP_CACHE[abbr] = result;
-  return result;
+  return Promise.resolve(result);
 }
 
-async function getPhotoDir(pat) {
+async function getPhotoDir() {
   if (PHOTO_DIR_CACHE !== null) return PHOTO_DIR_CACHE;
   try {
     const res = await fetch(
       `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/Stadium%20Photos`,
-      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
+      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
     );
     PHOTO_DIR_CACHE = res.ok ? await res.json() : [];
-    console.log('[ParkCast] Stadium Photos dir:', PHOTO_DIR_CACHE.map(f => `${f.name} (${(f.size/1024).toFixed(0)} KB)`));
   } catch (e) {
     PHOTO_DIR_CACHE = [];
     console.warn('[ParkCast] Could not list Stadium Photos:', e);
@@ -414,43 +374,21 @@ async function getPhotoDir(pat) {
 
 async function fetchStadiumPhoto(abbr) {
   if (PHOTO_CACHE[abbr] !== undefined) return PHOTO_CACHE[abbr];
-  const pat = getPAT();
-  if (!pat) { PHOTO_CACHE[abbr] = null; return null; }
 
-  // Map dashboard abbr → filename prefix used in Stadium Photos folder
   const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' };
   const fileAbbr = PHOTO_ABBR[abbr] || abbr;
 
-  // List directory once so we find the file regardless of extension or case
-  const dir = await getPhotoDir(pat);
+  const dir = await getPhotoDir();
   const match = dir.find(f =>
     f.type === 'file' &&
     f.name.toLowerCase().startsWith(fileAbbr.toLowerCase() + '.') &&
     /\.(jpe?g|png|webp)$/i.test(f.name)
   );
 
-  console.log(`[ParkCast] Photo lookup: abbr=${abbr} fileAbbr=${fileAbbr} match=${match?.name ?? 'none'}`);
   if (!match) { PHOTO_CACHE[abbr] = null; return null; }
 
-  try {
-    const res = await fetch(match.git_url,
-      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
-    );
-    if (!res.ok) { PHOTO_CACHE[abbr] = null; return null; }
-    const json = await res.json();
-    const mime = /\.png$/i.test(match.name) ? 'image/png' : 'image/jpeg';
-    PHOTO_CACHE[abbr] = `data:${mime};base64,${json.content.replace(/\n/g, '')}`;
-    return PHOTO_CACHE[abbr];
-  } catch (e) {
-    PHOTO_CACHE[abbr] = null;
-    return null;
-  }
-}
-
-function getPAT() {
-  const raw = document.getElementById('gh-pat')?.value || '';
-  // Strip any non-printable or non-ASCII characters that break fetch headers
-  return raw.replace(/[^\x20-\x7E]/g, '').trim();
+  PHOTO_CACHE[abbr] = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/Stadium%20Photos/${encodeURIComponent(match.name)}`;
+  return PHOTO_CACHE[abbr];
 }
 
 function setPatStatus(state, msg) {
@@ -458,15 +396,6 @@ function setPatStatus(state, msg) {
   if (!el) return;
   el.className = `pat-status ${state}`;
   el.textContent = msg;
-}
-
-function onPatInput() {
-  const pat = getPAT();
-  if (!pat) {
-    setPatStatus('idle', 'No token — using placeholder data');
-    return;
-  }
-  setPatStatus('idle', 'Token entered — click Run Projection');
 }
 
 // Minimal CSV parser (handles quoted fields)
@@ -490,8 +419,6 @@ function parseCSV(text) {
 
 async function fetchStadiumData(abbr) {
   if (DATA_CACHE[abbr]) return DATA_CACHE[abbr];
-  const pat = getPAT();
-  if (!pat) return null;
 
   const slug = TEAM_SLUG[abbr];
   if (!slug) return null;
@@ -499,15 +426,10 @@ async function fetchStadiumData(abbr) {
   setPatStatus('loading', `Scanning repo…`);
 
   try {
-    // Step 1: use Git Trees API (recursive) — no file count limit unlike Contents API
+    // Step 1: use Git Trees API (recursive, unauthenticated) to discover CSV filenames
     const treeRes = await fetch(
       `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/git/trees/main?recursive=1`,
-      {
-        headers: {
-          'Authorization': `Bearer ${pat}`,
-          'Accept': 'application/vnd.github.v3+json',
-        }
-      }
+      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
     );
     if (!treeRes.ok) {
       const err = await treeRes.json();
@@ -536,21 +458,13 @@ async function fetchStadiumData(abbr) {
 
     setPatStatus('loading', `Loading ${abbr} (${filesToFetch.length} files)…`);
 
-    // Step 3: fetch each file via Contents API using its exact path
+    // Step 3: fetch each CSV as raw text via raw.githubusercontent.com (no rate limit)
     let allRows = [];
     for (const path of filesToFetch) {
-      const fileRes = await fetch(
-        `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/${path}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${pat}`,
-            'Accept': 'application/vnd.github.v3+json',
-          }
-        }
-      );
+      const rawUrl = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/${path}`;
+      const fileRes = await fetch(rawUrl);
       if (!fileRes.ok) continue;
-      const json = await fileRes.json();
-      const text = atob(json.content.replace(/\n/g, ''));
+      const text = await fileRes.text();
       allRows = allRows.concat(parseCSV(text));
     }
 
@@ -618,8 +532,48 @@ let activeStadium = 24; // Oracle Park
 let projections  = null;
 let stadiumRows  = null; // real CSV rows for active stadium, null = use placeholder
 let stadiumPhoto = null; // base64 data URL for park photo, null = show placeholder
+let pfData       = null; // { teamName: { '2021': pf, ... } } from Annual Park Factor.xlsx
 let currentPage  = 1;
 let dayNight     = 'day';
+
+const ABBR_TO_PF_TEAM = {
+  ARI:'D-backs',    ATL:'Braves',      BAL:'Orioles',   BOS:'Red Sox',
+  CHC:'Cubs',       CIN:'Reds',        CLE:'Guardians', COL:'Rockies',
+  CWS:'White Sox',  DET:'Tigers',      HOU:'Astros',    KC:'Royals',
+  LAA:'Angels',     LAD:'Dodgers',     MIA:'Marlins',   MIL:'Brewers',
+  MIN:'Twins',      NYM:'Mets',        NYY:'Yankees',   OAK:'Athletics',
+  PHI:'Phillies',   PIT:'Pirates',     SD:'Padres',     SEA:'Mariners',
+  SF:'Giants',      STL:'Cardinals',   TB:'Rays',       TEX:'Rangers',
+  TOR:'Blue Jays',  WSH:'Nationals',
+};
+
+async function fetchParkFactorData() {
+  if (pfData) return pfData;
+  try {
+    const res = await fetch(
+      'https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/data/Annual%20Park%20Factor.xlsx'
+    );
+    if (!res.ok) return null;
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const wb = XLSX.read(bytes, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    pfData = {};
+    rows.forEach(row => {
+      const team = row['Team'];
+      if (!team) return;
+      pfData[team] = {};
+      ['2021','2022','2023','2024','2025'].forEach(yr => {
+        if (row[yr] !== undefined) pfData[team][yr] = +row[yr];
+      });
+    });
+    return pfData;
+  } catch(e) {
+    console.error('[ParkCast] park factor fetch error:', e);
+    return null;
+  }
+}
 
 function setDayNight(val) {
   dayNight = val;
@@ -648,195 +602,233 @@ function filterStadiums(q) {
 
 function updateWx() {
   document.getElementById('temp-val').textContent    = document.getElementById('wx-temp').value;
-  document.getElementById('hum-val').textContent     = document.getElementById('wx-hum').value;
   document.getElementById('wind-val').textContent    = document.getElementById('wx-wind').value;
+  document.getElementById('rhum-val').textContent    = document.getElementById('wx-rhum').value;
   const dd = +document.getElementById('wx-winddir').value;
   document.getElementById('winddir-val').textContent = DIRS[Math.round(dd/45)%8];
-  const pr = +document.getElementById('wx-press').value;
-  document.getElementById('press-val').textContent   = (pr/100).toFixed(2);
 }
 
 function getWx() {
   return {
     temp:    +document.getElementById('wx-temp').value,
-    hum:     +document.getElementById('wx-hum').value,
     wind:    +document.getElementById('wx-wind').value,
     winddir: +document.getElementById('wx-winddir').value,
-    press:   +document.getElementById('wx-press').value / 100,
-    date:    document.getElementById('game-date').value,
-    hour:    +document.getElementById('game-time').value,
+    rhum:    +document.getElementById('wx-rhum').value,
     dayNight: dayNight,
   };
 }
 
-// ── Real OLS model parameters (from dashboard_params.json) ────────
-const MODEL_PARAMS = {
-  "scaling": {
-    "temp_f":         { "mean": 72.41848549618321,   "std": 12.12822086457309   },
-    "rhum":           { "mean": 62.5111389312977,     "std": 18.861548507676023  },
-    "wspd_mph":       { "mean": 7.629282442748091,    "std": 3.798242334109692   },
-    "wind_cf":        { "mean": 1.8623719083969463,   "std": 9.754067652965643   },
-    "wind_lcf":       { "mean": 1.6524635114503814,   "std": 9.822541663340395   },
-    "wind_rcf":       { "mean": 1.8476555725190837,   "std": 9.61576567742797    },
-    "air_density":    { "mean": 1.1667085178334482,   "std": 0.047255215962392155 },
-    "wind_out_impact":{ "mean": 20.987092641221373,   "std": 122.28493735757027  }
+// ── Model v6.0 parameters (Stoff, RobustScaler, elevation + marine layer Ridge + Park FE) ──
+const MODEL = {
+  scaling: {
+    temp_f:      { center: 73.0,      scale: 16.3      },
+    rhum:        { center: 62.7,      scale: 26.0      },
+    wspd_mph:    { center: 7.0,       scale: 4.7       },
+    wind_cf:     { center: 1.89,      scale: 13.95     },
+    air_density: { center: 1.170203,  scale: 0.048265  },
+    elevation_ft:{ center: 340.0,     scale: 597.0     },
   },
-  "strikeouts": {
-    "fixed_effects": {
-      "Intercept": 8.888896295276977,
-      "temp_f": 0.2696585777756224, "rhum": -0.08968239326141088,
-      "wspd_mph": 0.03577571012339667, "wind_cf": 45.47563451953789,
-      "wind_lcf": -24.375785144479117, "wind_rcf": -23.853691055570646,
-      "air_density": 0.5734657782110245, "wind_out_impact": -0.028804665045429306,
-      "is_night": -0.19745377376672502
+  marine_layer_parks: ['SF','OAK','SD','LAA','LAD','SEA'],
+  elevation_by_park: {
+    ARI:1090, ATL:1050, BAL:20,  BOS:21,  CHC:595, CIN:489, CLE:660,
+    COL:5280, CWS:595,  DET:585, HOU:40,  KC:750,  LAA:160, LAD:340,
+    MIA:10,   MIL:617,  MIN:815, NYM:20,  NYY:55,  OAK:-21, PHI:20,
+    PIT:730,  SD:20,    SEA:16,  SF:65,   STL:455, TB:15,   TEX:551,
+    TOR:300,  WSH:35,
+  },
+  strikeouts: {
+    intercept: 8.8864,
+    temp_f: 0.1667, rhum: -0.0762, wspd_mph: 0.0265, wind_cf: 0.0073,
+    air_density: 0.3409, is_night: -0.2258,
+    elevation_ft: -0.0633, marine_layer_day: 0.0278, marine_layer_night: 0.0772,
+    park: {
+      ARI:0.006,  ATL:0.2056,  BAL:-0.4988, BOS:0.1009,  CHC:0.1141,
+      CIN:0.2084,  CLE:0.355,   COL:0.0554,  CWS:0.1206,  DET:-0.5231,
+      HOU:0.498,   KC:-0.4946,  LAA:0.0465,  LAD:0.473,   MIA:-0.0806,
+      MIL:0.3086,  MIN:-0.1003, NYM:0.277,   NYY:0.3445,  OAK:-0.3673,
+      PHI:0.178,   PIT:-0.2224, SD:0.1487,   SEA:-0.1212, SF:-0.0747,
+      STL:-0.397,  TB:0.2243,   TEX:-0.4726, TOR:-0.2288, WSH:-0.0831,
     },
-    "park_effects": {
-      "ARI":0.004382097227042104,"ATL":0.20715535198908178,"BAL":-0.9667832052106621,
-      "BOS":0.21144785214858997,"CHC":0.15750318292220894,"CIN":0.3619704726113104,
-      "CLE":0.576070699534671,"COL":0.809058590475893,"CWS":-0.0018780429598953632,
-      "DET":-0.9512683385846885,"HOU":1.123488730524633,"KC":-0.8134424067285869,
-      "LAA":0.16777305439648613,"LAD":0.7373336398566438,"MIA":-0.07624463320803655,
-      "MIL":0.4234680014557787,"MIN":-0.373404413604506,"NYM":0.5806528029929701,
-      "NYY":0.49144805787341334,"OAK":-0.8428855023831565,"PHI":0.07253559993753873,
-      "PIT":-0.3196633209881018,"SD":0.04697684825920279,"SEA":-0.4798581622605145,
-      "SF":0.047252009018691185,"STL":-0.5640843049782184,"TB":0.4699604831084343,
-      "TEX":-0.7835055798115398,"TOR":-0.333434624412334,"WSH":0.017975060797102867
+    interactions: {
+      ARI: { temp_f:0.0058,  rhum:0.1616,  wspd_mph:-0.0104, wind_cf:-0.0123, air_density:-0.0410 },
+      ATL: { temp_f:-0.1007, rhum:-0.0931, wspd_mph:0.0526,  wind_cf:0.0605,  air_density:0.0129  },
+      BAL: { temp_f:0.025,   rhum:-0.2593, wspd_mph:-0.0026, wind_cf:0.0136,  air_density:-0.0757 },
+      BOS: { temp_f:-0.1171, rhum:0.2089,  wspd_mph:0.01,    wind_cf:-0.0351, air_density:0.0795  },
+      CHC: { temp_f:-0.0215, rhum:0.0431,  wspd_mph:-0.002,  wind_cf:0.0324,  air_density:0.0263  },
+      CIN: { temp_f:0.1027,  rhum:-0.0541, wspd_mph:-0.105,  wind_cf:0.0185,  air_density:-0.0594 },
+      CLE: { temp_f:-0.0056, rhum:-0.0105, wspd_mph:-0.0309, wind_cf:-0.0828, air_density:-0.0380 },
+      COL: { temp_f:-0.0809, rhum:0.001,   wspd_mph:0.0184,  wind_cf:-0.0076, air_density:-0.123  },
+      CWS: { temp_f:0.0216,  rhum:-0.2054, wspd_mph:0.0182,  wind_cf:0.0486,  air_density:-0.0055 },
+      DET: { temp_f:0.22,    rhum:0.0335,  wspd_mph:-0.1712, wind_cf:0.0872,  air_density:-0.0509 },
+      HOU: { temp_f:0.2752,  rhum:0.1943,  wspd_mph:-0.0896, wind_cf:0.0359,  air_density:-0.1127 },
+      KC:  { temp_f:0.0601,  rhum:-0.1168, wspd_mph:-0.0103, wind_cf:0.0744,  air_density:0.169   },
+      LAA: { temp_f:0.0269,  rhum:0.0085,  wspd_mph:0.0848,  wind_cf:0.0936,  air_density:-0.0126 },
+      LAD: { temp_f:-0.0003, rhum:-0.0678, wspd_mph:0.037,   wind_cf:0.2844,  air_density:-0.0883 },
+      MIA: { temp_f:-0.1022, rhum:-0.0393, wspd_mph:0.0363,  wind_cf:-0.0654, air_density:0.0377  },
+      MIL: { temp_f:0.0777,  rhum:-0.1394, wspd_mph:-0.056,  wind_cf:-0.209,  air_density:-0.0081 },
+      MIN: { temp_f:-0.148,  rhum:0.0837,  wspd_mph:0.053,   wind_cf:-0.2017, air_density:0.1432  },
+      NYM: { temp_f:-0.0477, rhum:-0.0222, wspd_mph:0.1319,  wind_cf:-0.2025, air_density:0.1552  },
+      NYY: { temp_f:-0.0354, rhum:-0.1171, wspd_mph:0.1717,  wind_cf:0.0474,  air_density:0.0733  },
+      OAK: { temp_f:0.1391,  rhum:0.3452,  wspd_mph:-0.0848, wind_cf:-0.1722, air_density:-0.233  },
+      PHI: { temp_f:-0.0459, rhum:0.0631,  wspd_mph:0.0572,  wind_cf:0.1925,  air_density:0.1412  },
+      PIT: { temp_f:0.0731,  rhum:-0.1635, wspd_mph:-0.0924, wind_cf:-0.1267, air_density:0.0479  },
+      SD:  { temp_f:-0.0491, rhum:0.032,   wspd_mph:-0.0082, wind_cf:-0.0974, air_density:0.0781  },
+      SEA: { temp_f:-0.037,  rhum:-0.0445, wspd_mph:-0.0444, wind_cf:0.139,   air_density:0.0219  },
+      SF:  { temp_f:0.0521,  rhum:0.0059,  wspd_mph:0.0116,  wind_cf:-0.0304, air_density:-0.0787 },
+      STL: { temp_f:-0.0118, rhum:0.0344,  wspd_mph:0.0237,  wind_cf:0.0881,  air_density:0.0638  },
+      TB:  { temp_f:0.1093,  rhum:0.1015,  wspd_mph:-0.0331, wind_cf:0.1515,  air_density:0.0043  },
+      TEX: { temp_f:-0.0525, rhum:-0.0426, wspd_mph:0.1206,  wind_cf:0.0281,  air_density:0.1304  },
+      TOR: { temp_f:-0.0851, rhum:-0.144,  wspd_mph:0.1338,  wind_cf:-0.0868, air_density:0.0481  },
+      WSH: { temp_f:-0.0811, rhum:0.1267,  wspd_mph:-0.1935, wind_cf:-0.0588, air_density:0.0352  },
     }
   },
-  "runs": {
-    "fixed_effects": {
-      "Intercept": 4.336987627038021,
-      "temp_f": -0.07695015195389324, "rhum": -0.10589869092740863,
-      "wspd_mph": 0.04276164485029857, "wind_cf": 3.575649598904227,
-      "wind_lcf": -1.840656971155127, "wind_rcf": -1.8286818125218907,
-      "air_density": -0.40112374250963695, "wind_out_impact": -0.009736844537328489,
-      "is_night": 0.18154743063255843
+  runs: {
+    intercept: 4.4248,
+    temp_f: 0.0717, rhum: -0.0891, wspd_mph: 0.071, wind_cf: 0.1396,
+    air_density: -0.1449, is_night: 0.1441,
+    elevation_ft: 0.0594, marine_layer_day: -0.0255, marine_layer_night: -0.1555,
+    park: {
+      ARI:-0.0175, ATL:0.0126,  BAL:0.2429,  BOS:0.2309,  CHC:-0.1724,
+      CIN:0.2377,  CLE:-0.2091, COL:0.0092,  CWS:0.0975,  DET:0.1696,
+      HOU:-0.1214, KC:0.0905,   LAA:0.2247,  LAD:-0.4406, MIA:0.0666,
+      MIL:-0.1213, MIN:0.0786,  NYM:-0.1667, NYY:-0.1617, OAK:0.0781,
+      PHI:-0.0371, PIT:0.0682,  SD:-0.0347,  SEA:-0.0035, SF:-0.005,
+      STL:-0.2319, TB:-0.1506,  TEX:0.1012,  TOR:0.0864,  WSH:0.0785,
     },
-    "park_effects": {
-      "ARI":-0.27899008284926663,"ATL":-0.05787231275164207,"BAL":0.5185584691742872,
-      "BOS":0.47600499599531876,"CHC":-0.15490523992170485,"CIN":0.35280685141173196,
-      "CLE":-0.18707710401369346,"COL":-0.23889376278100652,"CWS":0.1938769149951812,
-      "DET":0.31018058553460426,"HOU":-0.4934848446252671,"KC":0.21100694228488984,
-      "LAA":0.21264661009755606,"LAD":-0.8923096538002735,"MIA":-0.049817897813860174,
-      "MIL":0.018204305506355798,"MIN":0.10394760534699078,"NYM":-0.18392430451876923,
-      "NYY":-0.13149750069256788,"OAK":-0.04360174280022353,"PHI":0.23920693032578705,
-      "PIT":0.09085963889427148,"SD":0.08563354748197967,"SEA":0.1833385590047979,
-      "SF":-0.1261639681639946,"STL":-0.4454371438207575,"TB":-0.4659264296626431,
-      "TEX":0.38523665536790547,"TOR":0.241853826066096,"WSH":0.12653955072791245
+    interactions: {
+      ARI: { temp_f:-0.0252, rhum:0.0118,  wspd_mph:0.0864,  wind_cf:-0.0218, air_density:0.0099  },
+      ATL: { temp_f:-0.1166, rhum:0.0097,  wspd_mph:0.083,   wind_cf:0.0861,  air_density:0.0622  },
+      BAL: { temp_f:0.0857,  rhum:0.0577,  wspd_mph:-0.0958, wind_cf:0.0878,  air_density:-0.0049 },
+      BOS: { temp_f:-0.011,  rhum:-0.1426, wspd_mph:-0.002,  wind_cf:0.1276,  air_density:0.0587  },
+      CHC: { temp_f:0.0343,  rhum:0.0263,  wspd_mph:0.0287,  wind_cf:0.2008,  air_density:-0.0303 },
+      CIN: { temp_f:0.0221,  rhum:0.0978,  wspd_mph:0.0406,  wind_cf:0.0196,  air_density:-0.0507 },
+      CLE: { temp_f:0.0193,  rhum:-0.0786, wspd_mph:-0.0438, wind_cf:0.0282,  air_density:0.0315  },
+      COL: { temp_f:-0.0107, rhum:-0.0701, wspd_mph:-0.0589, wind_cf:-0.0831, air_density:-0.0255 },
+      CWS: { temp_f:-0.0351, rhum:-0.013,  wspd_mph:-0.004,  wind_cf:-0.0506, air_density:0.0185  },
+      DET: { temp_f:0.0334,  rhum:0.0429,  wspd_mph:-0.0231, wind_cf:-0.0666, air_density:-0.0538 },
+      HOU: { temp_f:-0.0287, rhum:-0.0589, wspd_mph:-0.0894, wind_cf:-0.0651, air_density:0.0146  },
+      KC:  { temp_f:0.0291,  rhum:-0.0192, wspd_mph:0.1087,  wind_cf:0.0127,  air_density:-0.0577 },
+      LAA: { temp_f:-0.031,  rhum:-0.0258, wspd_mph:-0.0596, wind_cf:0.0765,  air_density:0.0673  },
+      LAD: { temp_f:-0.0233, rhum:0.1195,  wspd_mph:0.0531,  wind_cf:-0.2331, air_density:0.0964  },
+      MIA: { temp_f:0.0451,  rhum:-0.0179, wspd_mph:0.0749,  wind_cf:0.0168,  air_density:-0.0162 },
+      MIL: { temp_f:-0.0445, rhum:-0.0347, wspd_mph:0.0102,  wind_cf:0.0561,  air_density:0.0446  },
+      MIN: { temp_f:0.0879,  rhum:0.0484,  wspd_mph:0.0684,  wind_cf:0.0695,  air_density:-0.1125 },
+      NYM: { temp_f:0.0307,  rhum:-0.0494, wspd_mph:0.0017,  wind_cf:-0.0199, air_density:-0.0878 },
+      NYY: { temp_f:0.0334,  rhum:0.0843,  wspd_mph:-0.0049, wind_cf:-0.0416, air_density:-0.0819 },
+      OAK: { temp_f:-0.0976, rhum:-0.067,  wspd_mph:0.0037,  wind_cf:-0.0406, air_density:0.1035  },
+      PHI: { temp_f:-0.0042, rhum:-0.0625, wspd_mph:0.019,   wind_cf:-0.0143, air_density:-0.0051 },
+      PIT: { temp_f:0.0365,  rhum:0.0147,  wspd_mph:-0.0417, wind_cf:0.0955,  air_density:-0.0562 },
+      SD:  { temp_f:-0.0122, rhum:-0.0308, wspd_mph:0.0617,  wind_cf:0.0553,  air_density:0.006   },
+      SEA: { temp_f:-0.0284, rhum:0.067,   wspd_mph:-0.0604, wind_cf:-0.0327, air_density:-0.0004 },
+      SF:  { temp_f:0.0215,  rhum:-0.0257, wspd_mph:-0.0801, wind_cf:-0.0414, air_density:-0.0198 },
+      STL: { temp_f:-0.0048, rhum:0.033,   wspd_mph:0.0243,  wind_cf:0.0781,  air_density:-0.0046 },
+      TB:  { temp_f:-0.0688, rhum:0.0179,  wspd_mph:-0.0903, wind_cf:0.0186,  air_density:0.0129  },
+      TEX: { temp_f:0.1088,  rhum:-0.0076, wspd_mph:0.0041,  wind_cf:-0.0835, air_density:-0.1111 },
+      TOR: { temp_f:-0.0421, rhum:0.0073,  wspd_mph:0.0781,  wind_cf:-0.0718, air_density:0.0508  },
+      WSH: { temp_f:0.0681,  rhum:-0.0235, wspd_mph:-0.0215, wind_cf:-0.0233, air_density:-0.0034 },
     }
   }
 };
 
-// Compute air density from temp (°F), relative humidity (%), and pressure (hPa)
-function computeAirDensity(tempF, rhum, presHpa = 1013.25) {
+function computeAirDensity(tempF, rhum, presMb = 1013.25) {
   const tempK = (tempF - 32) * 5/9 + 273.15;
   const tempC = (tempF - 32) * 5/9;
   const eSat  = 6.1078 * Math.pow(10, (7.5 * tempC) / (tempC + 237.3));
   const e     = (rhum / 100) * eSat;
-  const pD    = (presHpa - e) * 100;
+  const pD    = (presMb - e) * 100;
   return pD / (287.05 * tempK) + (e * 100) / (461.5 * tempK);
 }
 
-// Decompose wind speed + direction into CF, LCF, RCF components
-// stadiumOrientation = compass bearing of CF from home plate
-function computeWindComponents(wspdMph, windDirDeg, stadiumOrientation) {
-  // Angle of wind arrival relative to outfield orientation
-  // windDirDeg is the direction the wind is blowing FROM (meteorological)
-  // We want the component blowing toward CF (outward from home plate)
-  const relDeg  = ((windDirDeg - stadiumOrientation) + 360) % 360;
-  const relRad  = relDeg * Math.PI / 180;
-  // CF component: positive = blowing out toward CF
-  const wind_cf  = wspdMph * Math.cos(relRad);
-  // LCF component: positive = blowing toward left-center
-  const wind_lcf = wspdMph * Math.cos((relDeg - 30) * Math.PI / 180);
-  // RCF component: positive = blowing toward right-center
-  const wind_rcf = wspdMph * Math.cos((relDeg + 30) * Math.PI / 180);
-  return { wind_cf, wind_lcf, wind_rcf };
-}
-
 function computeProjection(wx, stadium) {
-  const isNight = wx.dayNight === 'night' ? 1 : 0;
-  // Convert slider pressure from inHg to hPa (1 inHg = 33.8639 hPa)
-  const presHpa = wx.press * 33.8639;
+  const isNight   = wx.dayNight === 'night' ? 1 : 0;
+  const isDay     = 1 - isNight;
+  const isMarine  = MODEL.marine_layer_parks.includes(stadium.abbr) ? 1 : 0;
 
-  const airDensity  = computeAirDensity(wx.temp, wx.hum, presHpa);
-  const windComps   = computeWindComponents(wx.wind, wx.winddir, stadium.orientation);
-  const windOutImpact = wx.wind * windComps.wind_cf;
+  // Wind CF component: positive = blowing out toward CF
+  const relDeg    = ((wx.winddir - stadium.orientation) + 360) % 360;
+  const relRad    = relDeg * Math.PI / 180;
+  const wind_cf   = wx.wind * Math.cos(relRad);
 
-  // Build raw feature map
-  const raw = {
-    temp_f:          wx.temp,
-    rhum:            wx.hum,
-    wspd_mph:        wx.wind,
-    wind_cf:         windComps.wind_cf,
-    wind_lcf:        windComps.wind_lcf,
-    wind_rcf:        windComps.wind_rcf,
-    air_density:     airDensity,
-    wind_out_impact: windOutImpact,
-  };
+  // Compute air density from temp + humidity
+  const air_density  = computeAirDensity(wx.temp, wx.rhum);
+  const elevation_ft = MODEL.elevation_by_park[stadium.abbr] || 512.6;
 
-  // Standardize using training-set scaling params
-  const scaled = {};
-  for (const [feat, val] of Object.entries(raw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    scaled[feat] = (val - mean) / std;
+  // RobustScaler: (raw - center) / scale
+  const sc       = MODEL.scaling;
+  const sTemp    = (wx.temp      - sc.temp_f.center)       / sc.temp_f.scale;
+  const sRhum    = (wx.rhum      - sc.rhum.center)         / sc.rhum.scale;
+  const sWind    = (wx.wind      - sc.wspd_mph.center)     / sc.wspd_mph.scale;
+  const sWindCF  = (wind_cf      - sc.wind_cf.center)      / sc.wind_cf.scale;
+  const sDensity = (air_density  - sc.air_density.center)  / sc.air_density.scale;
+  const sElev    = (elevation_ft - sc.elevation_ft.center) / sc.elevation_ft.scale;
+
+  const kC    = MODEL.strikeouts;
+  const kPark = kC.park[stadium.abbr] || 0;
+  let kPred = kC.intercept
+    + kC.temp_f           * sTemp
+    + kC.rhum             * sRhum
+    + kC.wspd_mph         * sWind
+    + kC.wind_cf          * sWindCF
+    + kC.air_density      * sDensity
+    + kC.elevation_ft     * sElev
+    + kC.is_night         * isNight
+    + kC.marine_layer_day   * isMarine * isDay
+    + kC.marine_layer_night * isMarine * isNight
+    + kPark;
+
+  const rC    = MODEL.runs;
+  const rPark = rC.park[stadium.abbr] || 0;
+  let rPred = rC.intercept
+    + rC.temp_f           * sTemp
+    + rC.rhum             * sRhum
+    + rC.wspd_mph         * sWind
+    + rC.wind_cf          * sWindCF
+    + rC.air_density      * sDensity
+    + rC.elevation_ft     * sElev
+    + rC.is_night         * isNight
+    + rC.marine_layer_day   * isMarine * isDay
+    + rC.marine_layer_night * isMarine * isNight
+    + rPark;
+
+  // Park × weather interaction terms
+  const WEATHER_FEATS = ['temp_f', 'rhum', 'wspd_mph', 'wind_cf', 'air_density'];
+  const scaledVals    = { temp_f: sTemp, rhum: sRhum, wspd_mph: sWind, wind_cf: sWindCF, air_density: sDensity };
+  const kInter = kC.interactions[stadium.abbr] || {};
+  const rInter = rC.interactions[stadium.abbr] || {};
+  for (const feat of WEATHER_FEATS) {
+    kPred += (kInter[feat] || 0) * scaledVals[feat];
+    rPred += (rInter[feat] || 0) * scaledVals[feat];
   }
 
-  // Predict strikeouts (away team)
-  const kFE = MODEL_PARAMS.strikeouts.fixed_effects;
-  let kPred = kFE.Intercept;
-  for (const feat of Object.keys(scaled)) kPred += kFE[feat] * scaled[feat];
-  kPred += kFE.is_night * isNight;
-  kPred += MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
+  // Baseline at median conditions (scaled = 0), day game, same park
+  const kBase = kC.intercept + kPark;
+  const rBase = rC.intercept + rPark;
 
-  // Predict runs (away team)
-  const rFE = MODEL_PARAMS.runs.fixed_effects;
-  let rPred = rFE.Intercept;
-  for (const feat of Object.keys(scaled)) rPred += rFE[feat] * scaled[feat];
-  rPred += rFE.is_night * isNight;
-  rPred += MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
-
-  // Baseline (neutral conditions, same park) for delta display
-  const neutralWx = { temp: 72, hum: 62, wind: 7.6, winddir: stadium.orientation, press: 29.92, dayNight: 'day' };
-  const neutralPresHpa = 1013.25;
-  const neutralAD = computeAirDensity(72, 62, 1013.25);
-  const neutralWC = computeWindComponents(7.6, stadium.orientation, stadium.orientation);
-  const neutralWOI = 7.6 * neutralWC.wind_cf;
-  const neutralRaw = { temp_f:72, rhum:62, wspd_mph:7.6,
-    wind_cf: neutralWC.wind_cf, wind_lcf: neutralWC.wind_lcf, wind_rcf: neutralWC.wind_rcf,
-    air_density: neutralAD, wind_out_impact: neutralWOI };
-  const neutralScaled = {};
-  for (const [feat, val] of Object.entries(neutralRaw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    neutralScaled[feat] = (val - mean) / std;
-  }
-  let kBase = kFE.Intercept;
-  for (const feat of Object.keys(neutralScaled)) kBase += kFE[feat] * neutralScaled[feat];
-  kBase += MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
-  let rBase = rFE.Intercept;
-  for (const feat of Object.keys(neutralScaled)) rBase += rFE[feat] * neutralScaled[feat];
-  rBase += MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
-
-  // windEffect kept for badge label and wind rose
   const windEffect = computeWindEffect(wx.wind, wx.winddir, stadium.orientation);
 
-  // Park factor: ratio of weather-adjusted away runs vs. league-neutral baseline (4.55 runs/game),
-  // scaled so that 100 = neutral. Higher PF = more runs suppressed by conditions (pitcher-friendly).
-  // We use: PF = (rBase / rPred) × 100, so when weather inflates runs vs. baseline, PF < 100
-  // and when weather suppresses runs, PF > 100 — matching the standard run-suppression convention
-  // (park factor > 100 = hitter-friendly, < 100 = pitcher-friendly) by anchoring to rBase.
-  // Actually: standard PF > 100 = hitter-friendly (more runs). We use rPred/rBase × 100.
-  const parkFactor = +((rPred / rBase) * 100).toFixed(1);
+  // RSKPF = 100 × exp(w_R × ln(RPF/100) − w_K × ln(KPF/100))
+  const W_R = 0.8;
+  const W_K = 0.2;
+  const RPF = (rPred / rBase) * 100;
+  const KPF = (kPred / kBase) * 100;
+  const parkFactor = +(100 * Math.exp(W_R * Math.log(RPF / 100) - W_K * Math.log(KPF / 100))).toFixed(1);
+
+  // Park average RSKPF: baseline (median weather, day game) vs. league-neutral intercept
+  const parkAvg = +(100 * Math.exp(W_R * Math.log(rBase / rC.intercept) - W_K * Math.log(kBase / kC.intercept))).toFixed(1);
 
   return {
-    kPred:      +kPred.toFixed(2),
-    rPred:      +rPred.toFixed(2),
-    kDelta:     +(kPred - kBase).toFixed(2),
-    runsDelta:  +(rPred - rBase).toFixed(2),
-    rBase:      +rBase.toFixed(2),
+    kPred:       +kPred.toFixed(2),
+    rPred:       +rPred.toFixed(2),
+    kDelta:      +(kPred - kBase).toFixed(2),
+    runsDelta:   +(rPred - rBase).toFixed(2),
+    rBase:       +rBase.toFixed(2),
     parkFactor,
-    airDensity: +airDensity.toFixed(4),
+    parkAvg,
     windEffect,
+    wind_cf:     +wind_cf.toFixed(2),
+    air_density: +air_density.toFixed(4),
+    elevation_ft,
+    isMarine:    isMarine === 1,
   };
 }
 
@@ -881,10 +873,11 @@ async function runModel() {
   const stadium = STADIUMS[activeStadium];
   projections = computeProjection(wx, stadium);
 
-  // Fetch data and photo in parallel
+  // Fetch data, photo, and park factor Excel in parallel
   [stadiumRows, stadiumPhoto] = await Promise.all([
     fetchStadiumData(stadium.abbr),
     fetchStadiumPhoto(stadium.abbr),
+    fetchParkFactorData(),
   ]);
   renderMain();
 }
@@ -928,53 +921,43 @@ function renderMain() {
   const stadium = STADIUMS[activeStadium];
   const p = projections || computeProjection(wx, stadium);
 
-  // Air density badge — useful diagnostic
-  const adDiff = +(p.airDensity - 1.1667).toFixed(4);
-  const adLabel = adDiff > 0 ? `+${adDiff} kg/m³ (denser)` : `${adDiff} kg/m³ (thinner)`;
 
   document.getElementById('main-content').innerHTML = `
-    <!-- OUTER GRID: left content column + tall photo on right -->
+    <!-- OUTER GRID: left content + right photo -->
     <div style="display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:stretch;">
 
-      <!-- LEFT COLUMN: header info + KPI cards stacked -->
+      <!-- LEFT COLUMN -->
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="stadium-title-block">
           <div class="stadium-title">${stadium.name}</div>
           <div class="stadium-subtitle">${stadium.team} · ${stadium.city}</div>
-          ${stadium.blurb ? `<div class="stadium-blurb">${stadium.blurb}</div>` : ''}
           <div class="context-badges">
-            <span class="badge badge-blue">${wx.date}</span>
-            <span class="badge badge-amber">${wx.temp}°F · ${wx.hum}% RH</span>
+            <span class="badge badge-amber">${wx.temp}°F</span>
             <span class="badge badge-wind">Wind ${wx.wind} mph ${dirLabel(wx.winddir)} · ${p.windEffect.label}</span>
-            <span class="badge badge-blue">${wx.press.toFixed(2)} inHg · ρ ${adLabel}</span>
             <span class="badge ${wx.dayNight === 'day' ? 'badge-amber' : 'badge-blue'}">${wx.dayNight === 'day' ? '☀ Day game' : '☾ Night game'}</span>
             ${stadium.roof ? '<span class="badge badge-red">RETRACTABLE ROOF — weather may not reflect playing conditions</span>' : ''}
             ${stadium.altitude ? '<span class="badge badge-amber">HIGH ALTITUDE — constant air density effect not captured in regression</span>' : ''}
           </div>
-        </div>
-
-        <div class="disclaimer">
-          <div class="disclaimer-icon">&#9432;</div>
-          <div>Projections use a <strong>mixed-effects OLS model</strong> with park fixed effects (2021–2025 game-level data). Predictions are for the <em>away team</em>. Deltas are vs. neutral baseline conditions at this park.</div>
+          ${stadium.blurb && currentPage === 2 ? `<div class="stadium-blurb">${stadium.blurb}</div>` : ''}
         </div>
 
         ${currentPage === 1 ? `
-        <div class="kpi-row">
-          <div class="kpi-card ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">
-            <div class="kpi-label">Predicted Away Runs</div>
-            <div class="kpi-value ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">${p.rPred}</div>
-            <div class="kpi-desc">Weather-adjusted · ${p.runsDelta >= 0 ? '+' : ''}${p.runsDelta} vs. park baseline</div>
+        <!-- PREDICTED PARK FACTOR (inside left column) -->
+        <div class="panel" style="flex:1;">
+          <div class="panel-header">
+            <div class="panel-title">Predicted Park Factor</div>
+            <div class="panel-tag">Ridge model · Away runs ratio</div>
           </div>
-          <div class="kpi-card ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">
-            <div class="kpi-label">Predicted Away Strikeouts</div>
-            <div class="kpi-value ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">${p.kPred}</div>
-            <div class="kpi-desc">Weather-adjusted · ${p.kDelta >= 0 ? '+' : ''}${p.kDelta} vs. park baseline</div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0;flex:1;">
+            <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
+            <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= p.parkAvg ? '+' : ''}${(p.parkFactor - p.parkAvg).toFixed(1)} vs. park avg (${p.parkAvg})</div>
+            <div style="font-size:10px;color:var(--text2);font-family:var(--font-mono,monospace);margin-top:6px;letter-spacing:0.02em;opacity:0.7;">100 · e<sup>0.8·ln(RPF/100) − 0.2·ln(KPF/100)</sup></div>
           </div>
         </div>
         ` : ''}
       </div>
 
-      <!-- RIGHT COLUMN: tall park photo spanning full height -->
+      <!-- RIGHT COLUMN: tall park photo -->
       <div class="park-photo-wrap" style="min-height:260px;">
         ${stadiumPhoto
           ? `<img src="${stadiumPhoto}" alt="${stadium.name}">
@@ -982,46 +965,63 @@ function renderMain() {
           : `<div class="park-photo-placeholder">
                <div style="font-size:36px;opacity:0.15">⚾</div>
                <div>${stadium.name}</div>
-               <div style="opacity:0.5">${getPAT() ? 'Photo not found' : 'Enter PAT to load photo'}</div>
+               <div style="opacity:0.5">Photo not found</div>
              </div>`
         }
       </div>
     </div>
 
-    <!-- PROJECTIONS PAGE ONLY: park factor panels below the top grid -->
+    <!-- PROJECTIONS PAGE ONLY: historical chart + runs/K + histograms -->
     ${currentPage === 1 ? `
 
-    <!-- PARK FACTOR ROW -->
-    <div class="panel-row">
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Predicted Park Factor</div>
-          <div class="panel-tag">OLS model · Away runs ratio</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 0">
-          <div style="font-family:var(--font-h);font-size:64px;font-weight:700;line-height:1;color:${p.parkFactor > 101 ? 'var(--green)' : p.parkFactor < 99 ? 'var(--red)' : 'var(--text1)'}">${p.parkFactor}</div>
-          <div style="font-size:12px;color:var(--text2)">${p.parkFactor >= 100 ? '+' : ''}${(p.parkFactor - 100).toFixed(1)} vs. neutral (100)</div>
-          <div style="font-size:11px;color:var(--text2);text-align:center;max-width:260px;line-height:1.6">
-            PF = (predicted away runs ÷ park baseline) × 100<br>
-            Baseline: <span style="font-family:var(--font-m);color:var(--text1)">${p.rBase} runs</span> · Predicted: <span style="font-family:var(--font-m);color:var(--text1)">${p.rPred} runs</span>
-          </div>
-        </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Predicted vs. Historical Park Factor</div>
+        <div class="panel-tag">${pfData ? '2021–2025 · Annual Park Factor' : ''}</div>
       </div>
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Predicted vs. Historical Park Factor</div>
-          <div class="panel-tag">${stadiumRows ? '2020–2025 · real game data' : '2021–2025 · game-level · placeholder history'}</div>
-        </div>
-        <div class="chart-area" style="height:160px;">
-          <canvas id="pf-chart"></canvas>
-        </div>
-        <div style="font-size:11px;color:var(--text2)">
-          Bars = historical game-level park factor (placeholder). Amber line = today's model prediction (${p.parkFactor}).
-        </div>
+      <div class="chart-area" style="height:240px;">
+        <canvas id="pf-chart"></canvas>
       </div>
     </div>
 
-    ` : ''}
+    <!-- RUNS + K ROW -->
+    <div class="kpi-row">
+      <div class="kpi-card ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">
+        <div class="kpi-label">Predicted Away Runs</div>
+        <div class="kpi-value ${p.runsDelta > 0.05 ? 'up' : p.runsDelta < -0.05 ? 'down' : 'neutral'}">${p.rPred}</div>
+        <div class="kpi-desc">Weather-adjusted · ${p.runsDelta >= 0 ? '+' : ''}${p.runsDelta} vs. park baseline</div>
+      </div>
+      <div class="kpi-card ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">
+        <div class="kpi-label">Predicted Away Strikeouts</div>
+        <div class="kpi-value ${p.kDelta > 0.05 ? 'up' : p.kDelta < -0.05 ? 'down' : 'neutral'}">${p.kPred}</div>
+        <div class="kpi-desc">Weather-adjusted · ${p.kDelta >= 0 ? '+' : ''}${p.kDelta} vs. park baseline</div>
+      </div>
+    </div>
+
+    <!-- WEATHER HISTOGRAMS -->
+    <div class="section-divider">
+      <div class="section-divider-label">Weather Distributions</div>
+      <div class="section-divider-line"></div>
+      <div class="panel-tag">Games per bucket · Historical</div>
+    </div>
+    <div class="dist-row">
+      <div class="dist-card">
+        <div class="dist-label">Temperature (°F)</div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-temp"></canvas></div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Wind Speed (mph)</div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-wind"></canvas></div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Humidity (%)</div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-rhum"></canvas></div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-label">Wind Direction</div>
+        <div style="position:relative;height:210px"><canvas id="p1-dist-winddir"></canvas></div>
+      </div>
+    </div>
 
     <!-- PAGE 1 ONLY: analogs then model inputs -->
     ${currentPage === 1 ? `
@@ -1029,7 +1029,7 @@ function renderMain() {
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">Historical Analogs</div>
-        <div class="panel-tag">${stadiumRows ? 'Nearest weather matches · Real data' : 'Similar conditions · Placeholder data'}</div>
+        <div class="panel-tag">${stadiumRows ? 'Nearest weather matches · Real data' : ''}</div>
       </div>
       <table class="data-table">
         <thead><tr>
@@ -1043,7 +1043,7 @@ function renderMain() {
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">Model Inputs</div>
-        <div class="panel-tag">OLS · Away team · Park FE included</div>
+        <div class="panel-tag">Ridge v5 · Away team · Park FE included</div>
       </div>
       <table class="data-table">
         <thead><tr>
@@ -1052,6 +1052,8 @@ function renderMain() {
         <tbody>${buildInputTable(wx, stadium, p)}</tbody>
       </table>
     </div>
+
+    ` : ''}
 
     ` : ''}
 
@@ -1066,7 +1068,7 @@ function renderMain() {
     <div class="dist-row">
       <div class="dist-card">
         <div class="dist-label">Temperature (°F) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-temp"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-temp"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">58°F</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">50–66°F</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1075,7 +1077,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Pressure (hPa) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-press"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-press"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">1013 hPa</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">1010–1016</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1084,7 +1086,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Humidity (%) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-hum"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-hum"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">74%</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">63–83%</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1093,7 +1095,7 @@ function renderMain() {
       </div>
       <div class="dist-card">
         <div class="dist-label">Wind Speed (mph) by Month</div>
-        <div style="position:relative;height:100px"><canvas id="dist-wind"></canvas></div>
+        <div style="position:relative;height:150px"><canvas id="dist-wind"></canvas></div>
         <div class="dist-stats">
           <div class="dist-stat"><div class="dist-stat-val">14 mph</div><div class="dist-stat-lbl">median</div></div>
           <div class="dist-stat"><div class="dist-stat-val">10–18 mph</div><div class="dist-stat-lbl">IQR</div></div>
@@ -1127,7 +1129,7 @@ function renderMain() {
           <div class="heatmap-img-wrap" id="hm-wrap-${variable}">
             <div class="heatmap-img-placeholder">
               <div style="font-size:10px;font-family:var(--font-m);color:var(--text2)">
-                ${getPAT() ? 'Loading…' : 'Enter PAT to load heatmap'}
+                Loading…
               </div>
             </div>
           </div>
@@ -1141,6 +1143,7 @@ function renderMain() {
   if (currentPage === 1) {
     renderParkFactorChart(p);
     renderAnalogTable(wx);
+    renderPage1WeatherHists(wx);
   }
   if (currentPage === 2) {
     renderDistCharts();
@@ -1166,51 +1169,53 @@ function renderMain() {
 
 // Build the model inputs table rows for the driver breakdown panel
 function buildInputTable(wx, stadium, p) {
-  const isNight   = wx.dayNight === 'night' ? 1 : 0;
-  const presHpa   = wx.press * 33.8639;
-  const airDensity = p.airDensity;
-  const windComps  = computeWindComponents(wx.wind, wx.winddir, stadium.orientation);
-  const windOutImpact = wx.wind * windComps.wind_cf;
+  const isNight  = wx.dayNight === 'night' ? 1 : 0;
+  const isDay    = 1 - isNight;
+  const isMarine = MODEL.marine_layer_parks.includes(stadium.abbr) ? 1 : 0;
 
-  const raw = {
-    temp_f:          wx.temp,
-    rhum:            wx.hum,
-    wspd_mph:        wx.wind,
-    wind_cf:         windComps.wind_cf,
-    wind_lcf:        windComps.wind_lcf,
-    wind_rcf:        windComps.wind_rcf,
-    air_density:     airDensity,
-    wind_out_impact: windOutImpact,
-  };
+  const relDeg       = ((wx.winddir - stadium.orientation) + 360) % 360;
+  const wind_cf      = wx.wind * Math.cos(relDeg * Math.PI / 180);
+  const air_density  = computeAirDensity(wx.temp, wx.rhum);
+  const elevation_ft = MODEL.elevation_by_park[stadium.abbr] || 512.6;
 
-  const LABELS = {
-    temp_f:'Temperature (°F)', rhum:'Humidity (%)', wspd_mph:'Wind speed (mph)',
-    wind_cf:'Wind → CF', wind_lcf:'Wind → LCF', wind_rcf:'Wind → RCF',
-    air_density:'Air density (kg/m³)', wind_out_impact:'Wind out impact'
-  };
+  const features = [
+    { key: 'temp_f',       label: 'Temperature (°F)',    raw: wx.temp     },
+    { key: 'rhum',         label: 'Humidity (%)',         raw: wx.rhum     },
+    { key: 'wspd_mph',     label: 'Wind speed (mph)',     raw: wx.wind     },
+    { key: 'wind_cf',      label: 'Wind → CF',            raw: wind_cf     },
+    { key: 'air_density',  label: 'Air density (kg/m³)',  raw: air_density  },
+    { key: 'elevation_ft', label: 'Elevation (ft)',       raw: elevation_ft },
+  ];
 
-  const rFE = MODEL_PARAMS.runs.fixed_effects;
-  const kFE = MODEL_PARAMS.strikeouts.fixed_effects;
+  const rC = MODEL.runs;
+  const kC = MODEL.strikeouts;
+  const rInter = rC.interactions[stadium.abbr] || {};
+  const kInter = kC.interactions[stadium.abbr] || {};
 
   let rows = '';
-  for (const [feat, val] of Object.entries(raw)) {
-    const { mean, std } = MODEL_PARAMS.scaling[feat];
-    const z    = (val - mean) / std;
-    const rCon = rFE[feat] * z;
-    const kCon = kFE[feat] * z;
-    const rCol = rCon > 0.01 ? 'coef-pos' : rCon < -0.01 ? 'coef-neg' : '';
-    const kCol = kCon > 0.01 ? 'coef-pos' : kCon < -0.01 ? 'coef-neg' : '';
+  for (const { key, label, raw } of features) {
+    const { center, scale } = MODEL.scaling[key];
+    const z    = (raw - center) / scale;
+    // elevation has no park×weather interaction term; weather features do
+    const rCon = key === 'elevation_ft'
+      ? rC.elevation_ft * z
+      : (rC[key] + (rInter[key] || 0)) * z;
+    const kCon = key === 'elevation_ft'
+      ? kC.elevation_ft * z
+      : (kC[key] + (kInter[key] || 0)) * z;
+    const rCol = rCon > 0.001 ? 'coef-pos' : rCon < -0.001 ? 'coef-neg' : '';
+    const kCol = kCon > 0.001 ? 'coef-pos' : kCon < -0.001 ? 'coef-neg' : '';
     rows += `<tr>
-      <td style="color:var(--text1)">${LABELS[feat]}</td>
-      <td class="td-mono">${typeof val === 'number' ? val.toFixed(3) : val}</td>
+      <td style="color:var(--text1)">${label}</td>
+      <td class="td-mono">${raw.toFixed(2)}</td>
       <td class="td-mono" style="color:var(--text2)">${z.toFixed(3)}</td>
       <td class="td-mono ${rCol}">${rCon >= 0 ? '+' : ''}${rCon.toFixed(3)}</td>
       <td class="td-mono ${kCol}">${kCon >= 0 ? '+' : ''}${kCon.toFixed(3)}</td>
     </tr>`;
   }
   // is_night row
-  const rNight = rFE.is_night * isNight;
-  const kNight = kFE.is_night * isNight;
+  const rNight = rC.is_night * isNight;
+  const kNight = kC.is_night * isNight;
   rows += `<tr>
     <td style="color:var(--text1)">Is night game</td>
     <td class="td-mono">${isNight}</td>
@@ -1218,14 +1223,30 @@ function buildInputTable(wx, stadium, p) {
     <td class="td-mono ${rNight >= 0 ? 'coef-pos' : 'coef-neg'}">${rNight >= 0 ? '+' : ''}${rNight.toFixed(3)}</td>
     <td class="td-mono ${kNight >= 0 ? 'coef-pos' : 'coef-neg'}">${kNight >= 0 ? '+' : ''}${kNight.toFixed(3)}</td>
   </tr>`;
-  // Park effect row
-  const rPE = MODEL_PARAMS.runs.park_effects[stadium.abbr] || 0;
-  const kPE = MODEL_PARAMS.strikeouts.park_effects[stadium.abbr] || 0;
-  rows += `<tr style="border-top:1px solid var(--line2)">
-    <td style="color:var(--text1)">Park effect (${stadium.abbr})</td>
-    <td class="td-mono" colspan="2" style="color:var(--text2)">fixed effect</td>
-    <td class="td-mono ${rPE >= 0 ? 'coef-pos' : 'coef-neg'}">${rPE >= 0 ? '+' : ''}${rPE.toFixed(3)}</td>
-    <td class="td-mono ${kPE >= 0 ? 'coef-pos' : 'coef-neg'}">${kPE >= 0 ? '+' : ''}${kPE.toFixed(3)}</td>
+  // Marine layer rows (only shown for coastal parks)
+  if (isMarine) {
+    const rDay  = rC.marine_layer_day   * isDay;
+    const kDay  = kC.marine_layer_day   * isDay;
+    const rNgt  = rC.marine_layer_night * isNight;
+    const kNgt  = kC.marine_layer_night * isNight;
+    const rML   = rDay + rNgt;
+    const kML   = kDay + kNgt;
+    rows += `<tr>
+      <td style="color:var(--text1)">Marine layer (${isNight ? 'night' : 'day'})</td>
+      <td class="td-mono">1</td>
+      <td class="td-mono" style="color:var(--text2)">—</td>
+      <td class="td-mono ${rML >= 0 ? 'coef-pos' : 'coef-neg'}">${rML >= 0 ? '+' : ''}${rML.toFixed(3)}</td>
+      <td class="td-mono ${kML >= 0 ? 'coef-pos' : 'coef-neg'}">${kML >= 0 ? '+' : ''}${kML.toFixed(3)}</td>
+    </tr>`;
+  }
+  // Total row — exact delta from model
+  const rD = p.runsDelta;
+  const kD = p.kDelta;
+  rows += `<tr style="border-top:2px solid var(--line);font-weight:600">
+    <td style="color:var(--text0)">Total weather Δ</td>
+    <td class="td-mono" colspan="2" style="color:var(--text2)">.</td>
+    <td class="td-mono ${rD >= 0 ? 'coef-pos' : 'coef-neg'}">${rD >= 0 ? '+' : ''}${rD.toFixed(3)}</td>
+    <td class="td-mono ${kD >= 0 ? 'coef-pos' : 'coef-neg'}">${kD >= 0 ? '+' : ''}${kD.toFixed(3)}</td>
   </tr>`;
   return rows;
 }
@@ -1317,6 +1338,16 @@ function renderDistCharts() {
       const tag = document.querySelector('.dist-row')?.closest('div')?.previousElementSibling?.querySelector('.panel-tag');
     }
 
+    // Compute tight y-axis bounds from data so monthly variance is visible
+    let yMin, yMax;
+    if (allValid.length > 1) {
+      const dataMin = Math.min(...allValid);
+      const dataMax = Math.max(...allValid);
+      const pad = Math.max((dataMax - dataMin) * 0.5, 1);
+      yMin = dataMin - pad;
+      yMax = dataMax + pad;
+    }
+
     const chart = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -1347,9 +1378,17 @@ function renderDistCharts() {
             }
           }
         },
+        layout: { padding: { top: 2, bottom: 0, left: 0, right: 0 } },
+        datasets: { bar: { barPercentage: 0.95, categoryPercentage: 0.9 } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 9 }, maxRotation: 0 } },
-          y: { display: false }
+          x: { grid: { display: false }, ticks: { color: '#5e6e8a', font: { size: 8 }, maxRotation: 0 } },
+          y: {
+            display: true,
+            min: yMin,
+            max: yMax,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5e6e8a', font: { size: 7 }, maxTicksLimit: 3 },
+          }
         }
       }
     });
@@ -1474,35 +1513,17 @@ function renderParkFactorChart(p) {
 
   let labels, histData, isReal = false;
 
-  if (stadiumRows && stadiumRows.length > 0) {
-    // ── Real data: aggregate by year ───────────────────────────
-    const yearMap = {};
-    stadiumRows.forEach(r => {
-      const yr = r.season || (r.game_date || '').slice(0, 4);
-      if (!yr) return;
-      const awayRuns = parseFloat(r.away_runs_scored);
-      const homeRuns = parseFloat(r.home_runs_scored);
-      if (isNaN(awayRuns) || isNaN(homeRuns)) return;
-      if (!yearMap[yr]) yearMap[yr] = { away: [], home: [] };
-      yearMap[yr].away.push(awayRuns);
-      yearMap[yr].home.push(homeRuns);
-    });
-
-    // Overall average away runs as baseline
-    const allAway = stadiumRows.map(r => parseFloat(r.away_runs_scored)).filter(v => !isNaN(v));
-    const baseline = allAway.reduce((a, b) => a + b, 0) / allAway.length;
-
-    labels   = Object.keys(yearMap).sort();
-    histData = labels.map(yr => {
-      const avg = yearMap[yr].away.reduce((a, b) => a + b, 0) / yearMap[yr].away.length;
-      return +((avg / baseline) * 100).toFixed(1);
-    });
-    isReal = true;
+  // ── Prefer Annual Park Factor.xlsx data ──────────────────────
+  const teamName = ABBR_TO_PF_TEAM[STADIUMS[activeStadium].abbr];
+  const teamPF   = pfData && teamName && pfData[teamName];
+  if (teamPF && Object.keys(teamPF).length > 0) {
+    labels   = Object.keys(teamPF).sort();
+    histData = labels.map(yr => teamPF[yr]);
+    isReal   = true;
   } else {
-    // ── Placeholder: one bar per year 2021–2025 ────────────────
-    labels   = ['2021','2022','2023','2024','2025'];
-    const seed = activeStadium * 7;
-    histData = labels.map((_, i) => +(100 + Math.sin(seed + i) * 4 + (Math.random()-0.5)*3).toFixed(1));
+    // No Excel data loaded — render empty chart
+    labels   = [];
+    histData = [];
   }
 
   window._pfChart = new Chart(canvas, {
@@ -1545,12 +1566,72 @@ function renderParkFactorChart(p) {
       },
       scales: {
               x: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { family: 'DM Mono', size: 11 } }, title: { display: true, text: 'Game Year', color: '#FFFFFF', font: { size: 10 } } },
-              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
+              y: { min: 70, max: 120, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#FFFFFF', font: { size: 10 } }, title: { display: true, text: 'Park factor', color: '#FFFFFF', font: { size: 10 } } }
             }
           }
         });
       }
-      
+
+
+function renderPage1WeatherHists(wx) {
+  const makeHist = (canvasId, labels, counts, currentBinIdx, color, xLabel, yLabel) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (canvas._chart) canvas._chart.destroy();
+    canvas._chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: counts.map((_, i) => i === currentBinIdx ? color : color + '44'),
+          borderRadius: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        layout: { padding: { top: 2, bottom: 0, left: 0, right: 0 } },
+        datasets: { bar: { barPercentage: 0.95, categoryPercentage: 0.9 } },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: '#5e6e8a', font: { size: 8 }, maxRotation: 0 },
+            title: { display: true, text: xLabel, color: '#5e6e8a', font: { size: 8 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5e6e8a', font: { size: 7 } },
+            title: { display: false }
+          }
+        }
+      }
+    });
+  };
+
+  const tempEdges = [40, 48, 54, 60, 66, 72, 78, 84, 92];
+  const tempLabels = tempEdges.slice(0,-1).map((v,i) => v+'–'+tempEdges[i+1]);
+  const tempCounts = gaussianBins(62, 11, tempEdges.slice(0,-1).map((v,i) => (v+tempEdges[i+1])/2)).map(v => Math.round(v*2.8));
+  const tempBin = tempEdges.findIndex((v,i) => i < tempEdges.length-1 && wx.temp >= v && wx.temp < tempEdges[i+1]);
+  makeHist('p1-dist-temp', tempLabels, tempCounts, tempBin < 0 ? tempEdges.length-2 : tempBin, '#40b4e5', 'Temperature (°F)', '# Games');
+
+  const windLabels = ['0–4','5–8','9–12','13–16','17–20','21–25','26+'];
+  const windCounts = [80, 140, 220, 280, 180, 70, 30];
+  const windBin = wx.wind <= 4 ? 0 : wx.wind <= 8 ? 1 : wx.wind <= 12 ? 2 : wx.wind <= 16 ? 3 : wx.wind <= 20 ? 4 : wx.wind <= 25 ? 5 : 6;
+  makeHist('p1-dist-wind', windLabels, windCounts, windBin, '#f5803e', 'Wind Speed (mph)', '# Games');
+
+  const rhumEdges = [0, 20, 35, 50, 65, 80, 100];
+  const rhumLabels = rhumEdges.slice(0,-1).map((v,i) => v+'–'+rhumEdges[i+1]+'%');
+  const rhumCounts = gaussianBins(60, 22, rhumEdges.slice(0,-1).map((v,i) => (v+rhumEdges[i+1])/2)).map(v => Math.round(v*3.0));
+  const rhumBin = rhumEdges.findIndex((v,i) => i < rhumEdges.length-1 && wx.rhum >= v && wx.rhum < rhumEdges[i+1]);
+  makeHist('p1-dist-rhum', rhumLabels, rhumCounts, rhumBin < 0 ? rhumEdges.length-2 : rhumBin, '#a78bfa', 'Humidity (%)', '# Games');
+
+  const dirLabels = ['N','NE','E','SE','S','SW','W','NW'];
+  const dirCounts = [60, 55, 70, 90, 110, 130, 120, 75];
+  const dirBin = Math.round(((wx.winddir % 360) + 360) % 360 / 45) % 8;
+  makeHist('p1-dist-winddir', dirLabels, dirCounts, dirBin, '#34d399', 'Direction', '# Games');
+}
+
 renderStadiumList();
 renderMain();
 </script>
