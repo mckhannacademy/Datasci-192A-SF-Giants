@@ -219,9 +219,11 @@
         </div>
       </div>
  
-      <!-- DATA STATUS -->
+      <!-- GITHUB PAT -->
       <div class="pat-wrap">
-        <div class="pat-status idle" id="pat-status">Click Run Projection to load data</div>
+        <div class="sidebar-section-label">GitHub Access</div>
+        <input class="pat-input" type="password" id="gh-pat" placeholder="Paste GitHub PAT…" oninput="onPatInput()">
+        <div class="pat-status idle" id="pat-status">No token — using placeholder data</div>
       </div>
  
       <!-- RUN BUTTON -->
@@ -312,6 +314,7 @@ const STADIUMS = [
 const MLB_TEAMS = ['ARI','ATL','BAL','BOS','CHC','CIN','CLE','COL','CWS','DET','HOU','KC','LAA','LAD','MIA','MIL','MIN','NYM','NYY','OAK','PHI','PIT','SD','SEA','SF','STL','TB','TEX','TOR','WSH'];
 
 // ── GitHub data layer ─────────────────────────────────────────────
+const GH_API_BASE = 'https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/data';
 const TEAM_SLUG = {
   ARI:'dbacks',       ATL:'braves',    BAL:'orioles',   BOS:'fenway',
   CHC:'cubs',         CIN:'reds',      CLE:'guardians', COL:'rockies',
@@ -339,32 +342,51 @@ const HEATMAP_CACHE = {};
 // Folders use the CSV abbreviation convention (ATH, AZ, etc.)
 const FOLDER_ABBR = { ARI:'AZ', OAK:'ATH' }; // everything else matches directly
 
-function fetchHeatmapImages(abbr) {
-  if (HEATMAP_CACHE[abbr]) return Promise.resolve(HEATMAP_CACHE[abbr]);
+async function fetchHeatmapImages(abbr) {
+  if (HEATMAP_CACHE[abbr]) return HEATMAP_CACHE[abbr];
+  const pat = getPAT();
+  if (!pat) return null;
+
   const folder = FOLDER_ABBR[abbr] || abbr;
+  const variables = ['temp_f', 'pres', 'rhum', 'wspd_mph'];
   const fileNames = {
     temp_f:   'heatmap_temp_f_diff_ci.png',
     pres:     'heatmap_pres_diff_ci.png',
     rhum:     'heatmap_rhum_diff_ci.png',
     wspd_mph: 'heatmap_wspd_mph_diff_ci.png',
   };
+
   const result = {};
-  for (const [variable, fileName] of Object.entries(fileNames)) {
-    const path = `analysis/cleaned_analysis_diff_ci/${folder}/${fileName}`;
-    result[variable] = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/${path}`;
+  for (const variable of variables) {
+    const path = `analysis/cleaned_analysis_diff_ci/${folder}/${fileNames[variable]}`;
+    const url  = `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/${path}?ref=main`;
+    try {
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } });
+      if (!res.ok) {
+        console.warn(`[ParkCast] heatmap ${variable} → HTTP ${res.status} for ${url}`);
+        result[variable] = null; continue;
+      }
+      const json = await res.json();
+      result[variable] = `data:image/png;base64,${json.content.replace(/\n/g, '')}`;
+    } catch(e) {
+      console.error(`[ParkCast] heatmap ${variable} fetch error:`, e);
+      result[variable] = null;
+    }
   }
+
   HEATMAP_CACHE[abbr] = result;
-  return Promise.resolve(result);
+  return result;
 }
 
-async function getPhotoDir() {
+async function getPhotoDir(pat) {
   if (PHOTO_DIR_CACHE !== null) return PHOTO_DIR_CACHE;
   try {
     const res = await fetch(
       `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/Stadium%20Photos`,
-      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
     PHOTO_DIR_CACHE = res.ok ? await res.json() : [];
+    console.log('[ParkCast] Stadium Photos dir:', PHOTO_DIR_CACHE.map(f => `${f.name} (${(f.size/1024).toFixed(0)} KB)`));
   } catch (e) {
     PHOTO_DIR_CACHE = [];
     console.warn('[ParkCast] Could not list Stadium Photos:', e);
@@ -374,21 +396,43 @@ async function getPhotoDir() {
 
 async function fetchStadiumPhoto(abbr) {
   if (PHOTO_CACHE[abbr] !== undefined) return PHOTO_CACHE[abbr];
+  const pat = getPAT();
+  if (!pat) { PHOTO_CACHE[abbr] = null; return null; }
 
+  // Map dashboard abbr → filename prefix used in Stadium Photos folder
   const PHOTO_ABBR = { ARI: 'AZ', OAK: 'ATH' };
   const fileAbbr = PHOTO_ABBR[abbr] || abbr;
 
-  const dir = await getPhotoDir();
+  // List directory once so we find the file regardless of extension or case
+  const dir = await getPhotoDir(pat);
   const match = dir.find(f =>
     f.type === 'file' &&
     f.name.toLowerCase().startsWith(fileAbbr.toLowerCase() + '.') &&
     /\.(jpe?g|png|webp)$/i.test(f.name)
   );
 
+  console.log(`[ParkCast] Photo lookup: abbr=${abbr} fileAbbr=${fileAbbr} match=${match?.name ?? 'none'}`);
   if (!match) { PHOTO_CACHE[abbr] = null; return null; }
 
-  PHOTO_CACHE[abbr] = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/Stadium%20Photos/${encodeURIComponent(match.name)}`;
-  return PHOTO_CACHE[abbr];
+  try {
+    const res = await fetch(match.git_url,
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (!res.ok) { PHOTO_CACHE[abbr] = null; return null; }
+    const json = await res.json();
+    const mime = /\.png$/i.test(match.name) ? 'image/png' : 'image/jpeg';
+    PHOTO_CACHE[abbr] = `data:${mime};base64,${json.content.replace(/\n/g, '')}`;
+    return PHOTO_CACHE[abbr];
+  } catch (e) {
+    PHOTO_CACHE[abbr] = null;
+    return null;
+  }
+}
+
+function getPAT() {
+  const raw = document.getElementById('gh-pat')?.value || '';
+  // Strip any non-printable or non-ASCII characters that break fetch headers
+  return raw.replace(/[^\x20-\x7E]/g, '').trim();
 }
 
 function setPatStatus(state, msg) {
@@ -396,6 +440,19 @@ function setPatStatus(state, msg) {
   if (!el) return;
   el.className = `pat-status ${state}`;
   el.textContent = msg;
+}
+
+function onPatInput() {
+  const pat = getPAT();
+  if (!pat) {
+    setPatStatus('idle', 'No token — using placeholder data');
+    return;
+  }
+  // Clear cached results so new PAT triggers fresh fetches
+  Object.keys(HEATMAP_CACHE).forEach(k => delete HEATMAP_CACHE[k]);
+  PHOTO_DIR_CACHE = null;
+  Object.keys(PHOTO_CACHE).forEach(k => delete PHOTO_CACHE[k]);
+  setPatStatus('idle', 'Token entered — click Run Projection');
 }
 
 // Minimal CSV parser (handles quoted fields)
@@ -419,6 +476,8 @@ function parseCSV(text) {
 
 async function fetchStadiumData(abbr) {
   if (DATA_CACHE[abbr]) return DATA_CACHE[abbr];
+  const pat = getPAT();
+  if (!pat) return null;
 
   const slug = TEAM_SLUG[abbr];
   if (!slug) return null;
@@ -426,10 +485,15 @@ async function fetchStadiumData(abbr) {
   setPatStatus('loading', `Scanning repo…`);
 
   try {
-    // Step 1: use Git Trees API (recursive, unauthenticated) to discover CSV filenames
+    // Step 1: use Git Trees API (recursive) — no file count limit unlike Contents API
     const treeRes = await fetch(
       `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/git/trees/main?recursive=1`,
-      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+      {
+        headers: {
+          'Authorization': `Bearer ${pat}`,
+          'Accept': 'application/vnd.github.v3+json',
+        }
+      }
     );
     if (!treeRes.ok) {
       const err = await treeRes.json();
@@ -458,13 +522,21 @@ async function fetchStadiumData(abbr) {
 
     setPatStatus('loading', `Loading ${abbr} (${filesToFetch.length} files)…`);
 
-    // Step 3: fetch each CSV as raw text via raw.githubusercontent.com (no rate limit)
+    // Step 3: fetch each file via Contents API using its exact path
     let allRows = [];
     for (const path of filesToFetch) {
-      const rawUrl = `https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/${path}`;
-      const fileRes = await fetch(rawUrl);
+      const fileRes = await fetch(
+        `https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/${path}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${pat}`,
+            'Accept': 'application/vnd.github.v3+json',
+          }
+        }
+      );
       if (!fileRes.ok) continue;
-      const text = await fileRes.text();
+      const json = await fileRes.json();
+      const text = atob(json.content.replace(/\n/g, ''));
       allRows = allRows.concat(parseCSV(text));
     }
 
@@ -549,13 +621,18 @@ const ABBR_TO_PF_TEAM = {
 
 async function fetchParkFactorData() {
   if (pfData) return pfData;
+  const pat = getPAT();
+  if (!pat) return null;
   try {
     const res = await fetch(
-      'https://raw.githubusercontent.com/mckhannacademy/Datasci-192A-SF-Giants/main/data/Annual%20Park%20Factor.xlsx'
+      'https://api.github.com/repos/mckhannacademy/Datasci-192A-SF-Giants/contents/data/Annual%20Park%20Factor.xlsx',
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
     if (!res.ok) return null;
-    const buffer = await res.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
+    const json = await res.json();
+    const binary = atob(json.content.replace(/\n/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const wb = XLSX.read(bytes, { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws);
@@ -965,7 +1042,7 @@ function renderMain() {
           : `<div class="park-photo-placeholder">
                <div style="font-size:36px;opacity:0.15">⚾</div>
                <div>${stadium.name}</div>
-               <div style="opacity:0.5">Photo not found</div>
+               <div style="opacity:0.5">${getPAT() ? 'Photo not found' : 'Enter PAT to load photo'}</div>
              </div>`
         }
       </div>
@@ -1129,7 +1206,7 @@ function renderMain() {
           <div class="heatmap-img-wrap" id="hm-wrap-${variable}">
             <div class="heatmap-img-placeholder">
               <div style="font-size:10px;font-family:var(--font-m);color:var(--text2)">
-                Loading…
+                ${getPAT() ? 'Loading…' : 'Enter PAT to load heatmap'}
               </div>
             </div>
           </div>
