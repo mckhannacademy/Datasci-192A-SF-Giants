@@ -1,8 +1,8 @@
-Group Project Repository for Datasci 192A
+Group Project Repository for Data Science Practicum
 
 Project dashboard found in parkcast_dashboard.html.
 
-Data Sources: 
+**Data Sources:**
 
 Open Meteo API (https://open-meteo.com/)
 
@@ -10,7 +10,7 @@ pybaseball package (https://pypi.org/project/pybaseball/)
 
 Baseball Savant (https://baseballsavant.mlb.com/leaderboard/statcast-park-factors)
 
-Structure:
+**Structure:**
 
 Giants Capstone (legacy inclusion): contains introductory analysis and basic linear regressions 
 
