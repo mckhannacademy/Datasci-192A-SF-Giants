@@ -7,7 +7,8 @@ Open Meteo API (https://open-meteo.com/)
 pybaseball package (https://pypi.org/project/pybaseball/)
 Baseball Savant (https://baseballsavant.mlb.com/leaderboard/statcast-park-factors)
 
-Structure
+Structure:
+
 Giants Capstone (legacy inclusion): contains introductory analysis and basic linear regressions 
 Stadium Photos: JPEG images used on dashboard
 Data: Datasets used for analysis, includes both original versions and new versions with a day/night column attached. 
