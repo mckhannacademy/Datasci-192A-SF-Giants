@@ -25,3 +25,8 @@ Final Report: Includes technical appendix, full final report, and presentation s
 **Model:** Included in separate model branch (README found there)
 
 **Methods:** Outlined in technical appendix/final report
+
+***Guide For Adding New Data***:
+1. Change to desired start_date and end_date in *master_data_pull.ipynb* (in the **data**) folder - 
+2. In the **analysis** folder - run *day_night.ipynb* (no changes necessary, unless you wish to change the day/night boundary)
+3. In the **analysis** folder - run *cleaned_heatmap_ci_diff.ipynb* - should update heatmaps on the dashboard. If you wish to update the other graphics, the other notebooks may need to be run as well
